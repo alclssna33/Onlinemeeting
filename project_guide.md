@@ -15,6 +15,7 @@
 | DB / Auth | Supabase (PostgreSQL + RLS + Google OAuth) |
 | 이메일 | Google Apps Script Web App (GAS) |
 | 캘린더 | Google Calendar API (Service Account + Domain-Wide Delegation) |
+| 화상미팅 | Google Meet API v2 (Service Account + DWD, Calendar와 독립) |
 | 애니메이션 | framer-motion |
 | 아이콘 | lucide-react |
 
@@ -79,12 +80,10 @@ app/
 | `vendors` | 제휴업체 (profile_id로 가입 계정 연결) |
 | `stages` | 개원 단계 12개 (name, color, order_index) |
 | `meeting_requests` | 미팅 요청 (proposed_times[], status, confirmed_time, meet_link, vendor_note, calendar_event_id) |
+| `app_settings` | 앱 설정 key-value (calendar_enabled 등) |
 
 ### 필수 마이그레이션 (Supabase SQL Editor에서 실행)
-```sql
-ALTER TABLE meeting_requests ADD COLUMN IF NOT EXISTS vendor_note TEXT;
-ALTER TABLE meeting_requests ADD COLUMN IF NOT EXISTS calendar_event_id TEXT;
-```
+`supabase/migration_fix_vendor_fk.sql` 파일 전체 실행 (vendor_id FK 수정 + RLS 재설정 + app_settings 테이블 생성 포함)
 
 ---
 
@@ -98,14 +97,20 @@ SUPABASE_SERVICE_ROLE_KEY=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-GOOGLE_SERVICE_ACCOUNT_EMAIL=
-GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
-GOOGLE_CALENDAR_ID=          # 관리자 워크스페이스 이메일
+GOOGLE_SERVICE_ACCOUNT_EMAIL=          # 서비스 계정 이메일 (xxx@project.iam.gserviceaccount.com)
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=    # 서비스 계정 private key ("-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n")
+GOOGLE_CALENDAR_OWNER=                 # DWD subject — 워크스페이스 사용자 이메일 (절대 변경 안 함)
+GOOGLE_CALENDAR_ID=                    # 이벤트가 등록될 캘린더 ID (기본: 위와 동일, 별도 캘린더면 group.calendar.google.com 주소)
 
-GAS_WEBAPP_URL=              # Apps Script 이메일 Web App URL
+GAS_WEBAPP_URL=                        # Apps Script 이메일 Web App URL
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+> **GOOGLE_CALENDAR_OWNER vs GOOGLE_CALENDAR_ID 차이**
+> - `GOOGLE_CALENDAR_OWNER`: DWD로 가장할 워크스페이스 사용자 이메일. **절대 변경 금지.**
+> - `GOOGLE_CALENDAR_ID`: 실제 이벤트가 등록될 캘린더 ID. 별도 캘린더를 만들면 이것만 바꾸면 됨.
+> - 처음 설정 시 둘 다 같은 이메일로 설정해도 됨.
 
 ---
 
@@ -130,38 +135,130 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - 제휴업체 전용 가입 경로: `/join/vendor` → `/auth/vendor-callback`
 
 ### ✅ Step 5 — Google Calendar + Meet 링크 + 미팅 모니터링
-- Service Account + Domain-Wide Delegation으로 관리자 캘린더에 일정 자동 생성
-- 미팅 확정 시 Google Meet 링크 자동 생성 후 DB 저장 (Calendar와 독립적)
+- Service Account + Domain-Wide Delegation으로 지정 캘린더에 일정 자동 생성
+- 미팅 확정 시 Google Meet 링크 자동 생성 후 DB 저장 (Calendar와 완전히 독립)
 - 관리자 "📅 미팅 현황" 탭: 통계 카드 + 상태 필터 + 검색 + 테이블
 - 관리자 캘린더 ON/OFF 토글 + 🔍 진단 버튼 (API 연결 상태 단계별 진단)
 
-### ✅ Step 6 — UX 개선: 닉네임 설정 + 원장 미팅 현황 + 상세 버그픽스
+### ✅ Step 6 — UX 개선 + 버그픽스
 - 신규 원장 구글 가입 시 닉네임 입력 페이지(`/setup`)로 자동 이동
 - 원장 대시보드 "📅 내 미팅" 탭: 확정/대기/거절 섹션 토글 방식으로 확인
 - meeting_requests.vendor_id FK 버그 수정 (profiles → vendors 참조로 변경)
 - RLS 정책 수정: vendor_id로 profile_id 서브쿼리 조회
-- MeetingMonitor + VendorInbox null safety 전면 적용
+- 벤더 인박스 원장 닉네임 표시 수정 (adminClient로 RLS 우회)
+- notify/confirm API 모두 adminClient로 profiles 조회하여 닉네임 정확히 표시
 
 ---
 
-## 현재 알려진 이슈
+## Google Meet + Calendar 완전 가이드
 
-### Google Meet API 미활성화 (수동 조치 필요)
-두 API 모두 Google Cloud Console에서 활성화되지 않음:
-- **Google Meet API**: https://console.developers.google.com/apis/api/meet.googleapis.com/overview?project=1062615070613
-- **Google Calendar API**: https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=1062615070613
+### 전체 아키텍처
 
-활성화 후 Google Workspace 관리 콘솔 → 도메인 수준 위임 → 범위 추가:
-- `https://www.googleapis.com/auth/meetings.space.created`
+```
+서비스 계정 (id-50-55@onlinemeeting-489607.iam.gserviceaccount.com)
+    │
+    ├─ DWD로 GOOGLE_CALENDAR_OWNER 계정 가장
+    │
+    ├─ Google Meet API → meet.google.com 링크 생성 (Calendar 무관)
+    │
+    └─ Google Calendar API → GOOGLE_CALENDAR_ID 캘린더에 일정 등록
+```
 
 ---
 
-## 다음 단계
+### Step 1. Google Cloud Console
 
-### Step 7 — Vercel 배포
-- Vercel에 GitHub 연동 배포
-- 환경변수 설정 (GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY 줄바꿈 주의)
-- `NEXT_PUBLIC_APP_URL` 프로덕션 URL로 변경
+프로젝트 ID: `1062615070613`
+
+활성화해야 할 API (둘 다 필수):
+- **Google Meet API** (`meet.googleapis.com`)
+- **Google Calendar API** (`calendar-json.googleapis.com`)
+
+서비스 계정 정보:
+- 이메일: `id-50-55@onlinemeeting-489607.iam.gserviceaccount.com`
+- 클라이언트 ID (숫자): `109654456063098325165`
+
+---
+
+### Step 2. Google Workspace 관리 콘솔 DWD 설정
+
+[admin.google.com](https://admin.google.com) → 보안 → API 제어 → 도메인 수준 위임 관리
+
+클라이언트 ID `109654456063098325165` 에 아래 두 범위를 **콤마로 구분하여 한 줄에** 등록:
+
+```
+https://www.googleapis.com/auth/calendar,https://www.googleapis.com/auth/meetings.space.created
+```
+
+> ⚠️ 하나라도 빠지면 해당 API가 403 오류. Meet만 쓰고 Calendar는 별도 설정해도 DWD는 항상 두 범위 모두 필요.
+
+---
+
+### Step 3. 환경변수 설정
+
+```
+GOOGLE_SERVICE_ACCOUNT_EMAIL=id-50-55@onlinemeeting-489607.iam.gserviceaccount.com
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"
+GOOGLE_CALENDAR_OWNER=gabi0@mabongopen.kr   # DWD 가장 대상 (변경 금지)
+GOOGLE_CALENDAR_ID=gabi0@mabongopen.kr      # 이벤트 등록 캘린더 (변경 가능)
+```
+
+> `PRIVATE_KEY`는 반드시 큰따옴표로 감싸고, 줄바꿈을 `\n` 문자로 표현해야 함.
+
+---
+
+### 트러블슈팅 — 실제로 겪은 문제와 해결
+
+#### ❌ 문제 1: Google Meet 링크가 생성되지 않음
+**원인**: Google Cloud Console에서 Meet API, Calendar API 둘 다 비활성화 상태였음.
+**해결**: Cloud Console에서 두 API 모두 "사용 설정" 버튼 클릭.
+**확인 방법**: 관리자 패널 → 🔍 캘린더 진단 버튼 → 단계별 결과 확인.
+
+#### ❌ 문제 2: Meet 링크는 생성되는데 Calendar에 이벤트가 등록되지 않음
+**원인**: `google-calendar.ts`에서 Calendar 이벤트 생성 시 `conferenceData`(Google Meet 링크 중복 생성 요청)를 함께 보내고 있었음. Meet 링크는 이미 `google-meet.ts`에서 별도로 생성하는데, Calendar API에 또 Meet 생성을 요청하면 워크스페이스 정책이나 서비스 계정 권한에 따라 이벤트 생성 자체가 실패함.
+**해결**: `google-calendar.ts`에서 `conferenceData` 블록 완전 제거. 이제 Calendar는 순수하게 일정만 등록하고, Meet 링크는 `google-meet.ts`에서 독립적으로 생성.
+
+#### ❌ 문제 3: 원장 닉네임이 "알 수 없음"으로 표시/발송됨
+**원인**: Supabase RLS 정책으로 인해 벤더 세션 또는 다른 유저 세션에서 `profiles` 테이블의 다른 유저 데이터를 조회하면 null 반환됨.
+**해결**: `notify/route.ts`, `confirm/route.ts`, `vendor/page.tsx` 모두 `createAdminClient()` (서비스 롤, RLS 우회)로 `profiles` 직접 조회.
+
+#### ❌ 문제 4: 캘린더에 이벤트가 안 보임
+**원인**: 이벤트는 정상 생성됐으나 사용자의 기본 캘린더 이름이 "마봉이"로 되어 있어 다른 캘린더로 오해함.
+**해결**: Google Calendar 검색창에 `개비공` 검색하면 이벤트 확인 가능. 이벤트가 어느 캘린더에 있는지와 무관하게 정상 동작.
+
+---
+
+### 별도 캘린더 추가하는 방법
+
+나중에 다른 용도(예: 업체별, 단계별)로 별도 캘린더를 만들고 싶을 때:
+
+#### 1. 새 캘린더 만들기
+`gabi0@mabongopen.kr` 계정으로 [calendar.google.com](https://calendar.google.com) 접속
+→ 좌측 "다른 캘린더" 옆 **+** 버튼 → "새 캘린더 만들기"
+→ 이름 입력 (예: `개비공 미팅`) → 만들기
+
+#### 2. 캘린더 ID 확인
+새로 만든 캘린더 이름 옆 **⋮** → "설정 및 공유"
+→ 스크롤 내려서 **"캘린더 통합"** 섹션 → **캘린더 ID** 복사
+→ 형식: `abc123def456@group.calendar.google.com`
+
+#### 3. 서비스 계정에 편집 권한 부여 (필수!)
+같은 설정 페이지 → **"특정 사용자와 공유"**
+→ `id-50-55@onlinemeeting-489607.iam.gserviceaccount.com` 추가
+→ 권한: **"일정 변경 및 관리"** 선택 → 저장
+
+> ⚠️ 이 공유 설정을 빠뜨리면 서비스 계정이 새 캘린더에 쓸 수 없어서 403 오류 발생.
+> (기본 캘린더는 DWD로 이미 접근 가능하므로 공유 불필요. 별도 캘린더만 해당.)
+
+#### 4. 환경변수 변경
+`.env.local`에서 `GOOGLE_CALENDAR_ID`만 새 캘린더 ID로 교체:
+
+```
+GOOGLE_CALENDAR_OWNER=gabi0@mabongopen.kr              # 그대로 유지
+GOOGLE_CALENDAR_ID=abc123def456@group.calendar.google.com  # 새 캘린더 ID로 변경
+```
+
+서버 재시작하면 이후 미팅 확정부터 새 캘린더에 등록됨.
 
 ---
 
@@ -171,9 +268,11 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 |------|------|
 | 이메일 발송 | Resend 대신 GAS Web App 사용 (워크스페이스 일 1,500건) |
 | 캘린더 권한 | 워크스페이스 정책으로 캘린더 공유 불가 → Domain-Wide Delegation으로 해결 |
+| Meet vs Calendar | Google Meet 링크는 Meet API로 독립 생성, Calendar는 일정만 등록 (서로 무관) |
 | 역할 관리 | 관리자 패널에서 UI로 직접 연결 (Supabase Table Editor 직접 편집 불필요) |
 | 계정 연결 | 벤더사 담당자가 `/join/vendor`로 가입 → 관리자가 드롭다운으로 선택하여 연결 |
 | 미팅 날짜 선택 | 고정 슬롯 대신 빈 5개 슬롯 + datetime-local picker |
+| RLS 우회 | 타 유저 profiles 조회 필요 시 항상 createAdminClient() 사용 |
 
 ---
 
@@ -185,18 +284,12 @@ npm run dev
 # → http://localhost:3000
 ```
 
-## Google Meet + Calendar 설정
+---
 
-### 1. Google Cloud Console API 활성화
-- Google Meet API 활성화 필수
-- Google Calendar API 활성화 필수
+## 다음 단계
 
-### 2. Domain-Wide Delegation 설정
-1. Google Workspace 관리 콘솔 → 보안 → API 제어 → 도메인 수준 위임
-2. 클라이언트 ID: `109654456063098325165`
-3. OAuth 범위 (두 줄 모두 추가):
-   - `https://www.googleapis.com/auth/calendar`
-   - `https://www.googleapis.com/auth/meetings.space.created`
-
-### 3. 연결 진단
-관리자 패널 → 🔍 캘린더 진단 버튼으로 단계별 확인 가능
+### Step 7 — Vercel 배포
+- Vercel에 GitHub 연동 배포
+- 환경변수 설정 시 `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 줄바꿈 주의
+  - Vercel 환경변수 입력창에서는 실제 줄바꿈(Enter)으로 입력해야 함 (`\n` 문자 아님)
+- `NEXT_PUBLIC_APP_URL` 프로덕션 URL로 변경
