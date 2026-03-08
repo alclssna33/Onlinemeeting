@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import MiniCalendar from '@/app/components/MiniCalendar'
 
 // ── 타입 ──────────────────────────────────────────────────────
 type MeetingStatus = 'pending' | 'confirmed' | 'rejected'
@@ -393,6 +394,18 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
     }
   }
 
+  // 확정 미팅 → 캘린더용 데이터
+  const calendarMeetings = useMemo(() =>
+    meetings
+      .filter(m => m.status === 'confirmed' && m.confirmed_time)
+      .map(m => ({
+        date: m.confirmed_time!,
+        label: (m.doctor_profile?.name ?? '원장님') + ' 원장님',
+        color: m.stage.color,
+      })),
+    [meetings]
+  )
+
   // ── UI ────────────────────────────────────────────────────
   const TABS: { key: 'all' | MeetingStatus; label: string; count: number }[] = [
     { key: 'pending', label: '응답 필요', count: stats.pending },
@@ -403,7 +416,7 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* 상단 헤더 */}
+      {/* 상단 헤더 — 풀 너비 */}
       <div className="glass rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--brand-primary)' }}>
@@ -429,6 +442,10 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
           </div>
         </div>
       </div>
+
+      {/* 2단 레이아웃: 좌측 리스트 + 우측 캘린더 */}
+      <div className="flex gap-4 items-start">
+      <div className="flex-1 min-w-0 space-y-4">
 
       {/* 필터 영역 */}
       <div className="glass rounded-2xl px-5 py-4 space-y-3">
@@ -544,6 +561,15 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
           </AnimatePresence>
         </div>
       )}
+
+      </div>{/* end 좌측 리스트 */}
+
+      {/* 우측: 미니 캘린더 */}
+      <div className="w-64 shrink-0 hidden md:block">
+        <MiniCalendar meetings={calendarMeetings} />
+      </div>
+
+      </div>{/* end 2단 레이아웃 */}
     </div>
   )
 }

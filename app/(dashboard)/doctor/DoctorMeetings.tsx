@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import MiniCalendar from '@/app/components/MiniCalendar'
 
 type MeetingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled'
 
@@ -86,6 +87,14 @@ export default function DoctorMeetings({ meetings }: Props) {
   const confirmed = meetings.filter(m => m.status === 'confirmed')
   const others = meetings.filter(m => m.status === 'rejected' || m.status === 'cancelled')
 
+  const calendarMeetings = confirmed
+    .filter(m => m.confirmed_time)
+    .map(m => ({
+      date: m.confirmed_time!,
+      label: m.vendor.company_name,
+      color: m.stage.color,
+    }))
+
   if (meetings.length === 0) {
     return (
       <div className="glass rounded-2xl px-6 py-16 text-center">
@@ -99,7 +108,10 @@ export default function DoctorMeetings({ meetings }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex gap-4 items-start">
+
+    {/* 좌측: 미팅 목록 */}
+    <div className="flex-1 min-w-0 space-y-3">
 
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-3">
@@ -240,6 +252,13 @@ export default function DoctorMeetings({ meetings }: Props) {
           ))}
         </Section>
       )}
+    </div>
+
+    {/* 우측: 미니 캘린더 */}
+    <div className="w-64 shrink-0 hidden md:block">
+      <MiniCalendar meetings={calendarMeetings} />
+    </div>
+
     </div>
   )
 }
