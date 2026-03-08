@@ -242,15 +242,7 @@ GOOGLE_CALENDAR_ID=gabi0@mabongopen.kr      # 이벤트 등록 캘린더 (변경
 → 스크롤 내려서 **"캘린더 통합"** 섹션 → **캘린더 ID** 복사
 → 형식: `abc123def456@group.calendar.google.com`
 
-#### 3. 서비스 계정에 편집 권한 부여 (필수!)
-같은 설정 페이지 → **"특정 사용자와 공유"**
-→ `id-50-55@onlinemeeting-489607.iam.gserviceaccount.com` 추가
-→ 권한: **"일정 변경 및 관리"** 선택 → 저장
-
-> ⚠️ 이 공유 설정을 빠뜨리면 서비스 계정이 새 캘린더에 쓸 수 없어서 403 오류 발생.
-> (기본 캘린더는 DWD로 이미 접근 가능하므로 공유 불필요. 별도 캘린더만 해당.)
-
-#### 4. 환경변수 변경
+#### 3. 환경변수 변경
 `.env.local`에서 `GOOGLE_CALENDAR_ID`만 새 캘린더 ID로 교체:
 
 ```
@@ -259,6 +251,10 @@ GOOGLE_CALENDAR_ID=abc123def456@group.calendar.google.com  # 새 캘린더 ID로
 ```
 
 서버 재시작하면 이후 미팅 확정부터 새 캘린더에 등록됨.
+
+> **공유 설정이 필요 없는 이유**: DWD는 서비스 계정이 `gabi0@mabongopen.kr` 본인으로 "변장"하는 방식.
+> `gabi0@mabongopen.kr` 계정으로 만든 캘린더는 소유자가 동일하므로, DWD로 이미 모든 권한을 가짐.
+> 별도 공유 설정 없이 캘린더 ID만 바꾸면 바로 작동함.
 
 ---
 
