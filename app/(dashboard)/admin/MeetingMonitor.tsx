@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import MiniCalendar from '@/app/components/MiniCalendar'
 
 type MeetingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled'
 
@@ -94,6 +95,17 @@ export default function MeetingMonitor() {
     )
   }
 
+  const calendarMeetings = useMemo(() =>
+    meetings
+      .filter(m => m.status === 'confirmed' && m.confirmed_time)
+      .map(m => ({
+        date: m.confirmed_time!,
+        label: `${m.doctor_profile?.name ?? '원장님'} × ${m.vendor?.company_name ?? ''}`,
+        color: m.stage?.color,
+      })),
+    [meetings]
+  )
+
   return (
     <div className="space-y-4">
       {/* 통계 카드 */}
@@ -110,6 +122,10 @@ export default function MeetingMonitor() {
           </div>
         ))}
       </div>
+
+      {/* 2단 레이아웃: 좌측 필터+테이블 / 우측 캘린더 */}
+      <div className="flex gap-4 items-start">
+      <div className="flex-1 min-w-0 space-y-4">
 
       {/* 필터 */}
       <div className="glass rounded-2xl px-5 py-4 space-y-3">
@@ -251,6 +267,15 @@ export default function MeetingMonitor() {
           </div>
         )}
       </div>
+
+      </div>{/* end 좌측 */}
+
+      {/* 우측: 캘린더 */}
+      <div className="w-64 shrink-0 hidden lg:block">
+        <MiniCalendar meetings={calendarMeetings} />
+      </div>
+
+      </div>{/* end 2단 레이아웃 */}
     </div>
   )
 }
