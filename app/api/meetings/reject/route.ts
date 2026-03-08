@@ -8,7 +8,7 @@ import { notifyDoctorMeetingRejected } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   try {
-    const { requestId } = await req.json()
+    const { requestId, vendorNote } = await req.json()
     if (!requestId) return NextResponse.json({ error: 'requestId 필요' }, { status: 400 })
 
     const supabase = await createClient()
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     const { error: updateError } = await (supabase as any)
       .from('meeting_requests')
-      .update({ status: 'rejected' })
+      .update({ status: 'rejected', vendor_note: vendorNote || null })
       .eq('id', requestId)
 
     if (updateError) throw updateError

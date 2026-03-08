@@ -14,6 +14,7 @@ type Meeting = {
   confirmed_time: string | null
   meet_link: string | null
   note: string | null
+  vendor_note: string | null
   created_at: string
   stage: { name: string; color: string; icon: string }
   doctor_profile: { name: string }
@@ -65,11 +66,13 @@ const STATUS_BG: Record<MeetingStatus, string> = {
 function MeetingCard({ meeting, onConfirm, onReject, loading }: {
   meeting: Meeting
   onConfirm: (id: string, time: string) => void
-  onReject: (id: string) => void
-  loading: string | null  // 처리 중인 requestId
+  onReject: (id: string, note: string) => void
+  loading: string | null
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [rejectMode, setRejectMode] = useState(false)
+  const [rejectNote, setRejectNote] = useState('')
   const isLoading = loading === meeting.id
   const clinicName = meeting.doctor_info?.clinic_name
 
@@ -165,12 +168,22 @@ function MeetingCard({ meeting, onConfirm, onReject, loading }: {
         </div>
       )}
 
-      {/* 메모 표시 (있을 경우) */}
-      {meeting.note && meeting.status !== 'confirmed' && (
-        <div className="px-5 pb-3">
+      {/* 원장 전달사항 */}
+      {meeting.note && (
+        <div className="px-5 pb-2">
           <p className="text-xs px-3 py-2 rounded-xl italic"
             style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
-            💬 {meeting.note}
+            💬 원장님: {meeting.note}
+          </p>
+        </div>
+      )}
+
+      {/* 거절됨 → 내가 남긴 거절 사유 */}
+      {meeting.status === 'rejected' && meeting.vendor_note && (
+        <div className="px-5 pb-3">
+          <p className="text-xs px-3 py-2 rounded-xl italic"
+            style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626', border: '1px solid #fecaca' }}>
+            📝 거절 사유: {meeting.vendor_note}
           </p>
         </div>
       )}
@@ -214,28 +227,63 @@ function MeetingCard({ meeting, onConfirm, onReject, loading }: {
               </div>
 
               {/* 확정 / 거절 버튼 */}
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => selectedTime && onConfirm(meeting.id, selectedTime)}
-                  disabled={!selectedTime || isLoading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
-                  style={{ background: '#16a34a' }}
-                >
-                  {isLoading ? '처리 중...' : selectedTime ? `✅ 확정하기` : '시간을 선택하세요'}
-                </button>
-                <button
-                  onClick={() => onReject(meeting.id)}
-                  disabled={isLoading}
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80 disabled:opacity-40"
-                  style={{
-                    background: 'var(--bg-muted)',
-                    color: '#dc2626',
-                    border: '1px solid #fecaca',
-                  }}
-                >
-                  거절
-                </button>
-              </div>
+              {!rejectMode ? (
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => selectedTime && onConfirm(meeting.id, selectedTime)}
+                    disabled={!selectedTime || isLoading}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
+                    style={{ background: '#16a34a' }}
+                  >
+                    {isLoading ? '처리 중...' : selectedTime ? '✅ 확정하기' : '시간을 선택하세요'}
+                  </button>
+                  <button
+                    onClick={() => setRejectMode(true)}
+                    disabled={isLoading}
+                    className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80 disabled:opacity-40"
+                    style={{ background: 'var(--bg-muted)', color: '#dc2626', border: '1px solid #fecaca' }}
+                  >
+                    거절
+                  </button>
+                </div>
+              ) : (
+                /* 거절 사유 입력 */
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold" style={{ color: '#dc2626' }}>
+                    거절 사유 (선택사항)
+                  </p>
+                  <textarea
+                    autoFocus
+                    placeholder="거절 이유나 전달 사항을 적어주세요. (예: 해당 기간 일정이 없습니다 / 다른 업체와 계약 완료 등)"
+                    value={rejectNote}
+                    onChange={e => setRejectNote(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-xl border text-sm resize-none outline-none"
+                    style={{
+                      background: 'var(--bg-muted)',
+                      borderColor: '#fecaca',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setRejectMode(false); setRejectNote('') }}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold border"
+                      style={{ borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => onReject(meeting.id, rejectNote)}
+                      disabled={isLoading}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
+                      style={{ background: '#dc2626' }}
+                    >
+                      {isLoading ? '처리 중...' : '거절 확정'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -315,14 +363,13 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
     }
   }
 
-  async function handleReject(requestId: string) {
-    if (!confirm('이 미팅 요청을 거절하시겠습니까?')) return
+  async function handleReject(requestId: string, vendorNote: string) {
     setLoadingId(requestId)
     try {
       const res = await fetch('/api/meetings/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId }),
+        body: JSON.stringify({ requestId, vendorNote }),
       })
       if (!res.ok) {
         const data = await res.json()
