@@ -33,20 +33,23 @@
 ```
 app/
 ├── (auth)/
-│   └── login/                  # 구글 로그인 페이지
+│   ├── login/                   # 구글 로그인 페이지
+│   └── setup/                   # 신규 가입 닉네임 설정 페이지
 ├── auth/
-│   ├── callback/route.ts        # OAuth 콜백 (일반 가입)
+│   ├── callback/route.ts        # OAuth 콜백 (일반 가입, 신규 → /setup 리다이렉트)
 │   └── vendor-callback/route.ts # OAuth 콜백 (벤더 전용)
 ├── (dashboard)/
 │   ├── doctor/                  # 원장 대시보드
 │   │   ├── page.tsx
+│   │   ├── DoctorDashboard.tsx      # 탭 (업체 찾기 / 내 미팅)
+│   │   ├── DoctorMeetings.tsx       # 내 미팅 현황 (확정/대기/거절, 토글)
 │   │   └── MeetingRequestModal.tsx  # 미팅 신청 모달
 │   ├── vendor/                  # 벤더사 대시보드
 │   │   ├── page.tsx
 │   │   └── VendorInbox.tsx          # 미팅 수락/거절 인박스
 │   └── admin/                   # 관리자 패널
 │       ├── page.tsx
-│       ├── AdminPanel.tsx           # 단계/업체 관리 + 계정 연결
+│       ├── AdminPanel.tsx           # 단계/업체 관리 + 계정 연결 + 캘린더 토글
 │       └── MeetingMonitor.tsx       # 전체 미팅 현황 모니터링
 ├── join/
 │   └── vendor/page.tsx          # 제휴업체 전용 가입 페이지
@@ -56,9 +59,11 @@ app/
     │   ├── vendors/route.ts      # 제휴업체 CRUD
     │   ├── vendors/link/route.ts # 벤더사 계정 연결/해제
     │   ├── profiles/route.ts     # 연결 가능한 가입자 목록
-    │   └── meetings/route.ts     # 전체 미팅 현황 조회
+    │   ├── meetings/route.ts     # 전체 미팅 현황 조회
+    │   ├── settings/route.ts     # 앱 설정 GET/PATCH (캘린더 ON/OFF 등)
+    │   └── test-calendar/route.ts # Google Meet·Calendar 연동 진단
     └── meetings/
-        ├── confirm/route.ts      # 미팅 확정 (캘린더 생성 포함)
+        ├── confirm/route.ts      # 미팅 확정 (Meet 링크 생성 + 캘린더 선택적 생성)
         ├── reject/route.ts       # 미팅 거절 + 거절 사유 저장
         └── notify/route.ts       # 미팅 신청 이메일 발송
 ```
@@ -126,14 +131,34 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ### ✅ Step 5 — Google Calendar + Meet 링크 + 미팅 모니터링
 - Service Account + Domain-Wide Delegation으로 관리자 캘린더에 일정 자동 생성
-- 미팅 확정 시 Google Meet 링크 자동 생성 후 DB 저장
+- 미팅 확정 시 Google Meet 링크 자동 생성 후 DB 저장 (Calendar와 독립적)
 - 관리자 "📅 미팅 현황" 탭: 통계 카드 + 상태 필터 + 검색 + 테이블
+- 관리자 캘린더 ON/OFF 토글 + 🔍 진단 버튼 (API 연결 상태 단계별 진단)
+
+### ✅ Step 6 — UX 개선: 닉네임 설정 + 원장 미팅 현황 + 상세 버그픽스
+- 신규 원장 구글 가입 시 닉네임 입력 페이지(`/setup`)로 자동 이동
+- 원장 대시보드 "📅 내 미팅" 탭: 확정/대기/거절 섹션 토글 방식으로 확인
+- meeting_requests.vendor_id FK 버그 수정 (profiles → vendors 참조로 변경)
+- RLS 정책 수정: vendor_id로 profile_id 서브쿼리 조회
+- MeetingMonitor + VendorInbox null safety 전면 적용
+
+---
+
+## 현재 알려진 이슈
+
+### Google Meet API 미활성화 (수동 조치 필요)
+두 API 모두 Google Cloud Console에서 활성화되지 않음:
+- **Google Meet API**: https://console.developers.google.com/apis/api/meet.googleapis.com/overview?project=1062615070613
+- **Google Calendar API**: https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=1062615070613
+
+활성화 후 Google Workspace 관리 콘솔 → 도메인 수준 위임 → 범위 추가:
+- `https://www.googleapis.com/auth/meetings.space.created`
 
 ---
 
 ## 다음 단계
 
-### Step 6 — Vercel 배포
+### Step 7 — Vercel 배포
 - Vercel에 GitHub 연동 배포
 - 환경변수 설정 (GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY 줄바꿈 주의)
 - `NEXT_PUBLIC_APP_URL` 프로덕션 URL로 변경
@@ -160,9 +185,18 @@ npm run dev
 # → http://localhost:3000
 ```
 
-## Google Calendar Domain-Wide Delegation 설정
+## Google Meet + Calendar 설정
 
-1. Google Cloud Console → 서비스 계정 키 생성 (JSON)
-2. Google Workspace 관리 콘솔 → 보안 → API 제어 → 도메인 수준 위임
-3. 클라이언트 ID: `109654456063098325165`
-4. OAuth 범위: `https://www.googleapis.com/auth/calendar`
+### 1. Google Cloud Console API 활성화
+- Google Meet API 활성화 필수
+- Google Calendar API 활성화 필수
+
+### 2. Domain-Wide Delegation 설정
+1. Google Workspace 관리 콘솔 → 보안 → API 제어 → 도메인 수준 위임
+2. 클라이언트 ID: `109654456063098325165`
+3. OAuth 범위 (두 줄 모두 추가):
+   - `https://www.googleapis.com/auth/calendar`
+   - `https://www.googleapis.com/auth/meetings.space.created`
+
+### 3. 연결 진단
+관리자 패널 → 🔍 캘린더 진단 버튼으로 단계별 확인 가능

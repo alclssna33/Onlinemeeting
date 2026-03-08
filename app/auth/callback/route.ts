@@ -20,20 +20,30 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .single() as { data: { role: string } | null; error: unknown }
 
-        // 프로필이 없으면 (신규 소셜 로그인 유저) 직접 생성
+        // 프로필이 없으면 (신규 소셜 로그인 유저) 기본 프로필 생성 후 닉네임 설정 페이지로
         if (!profile) {
           const { error: insertError } = await (supabase.from('profiles') as any).insert({
             id: user.id,
             role: 'doctor',
-            name: user.user_metadata?.name ?? user.email?.split('@')[0] ?? '사용자',
+            name: '__pending__',   // 닉네임 미설정 표시
             email: user.email ?? '',
           })
           if (insertError) {
             console.error('[콜백 백엔드] 프로필 자동 생성 실패:', insertError)
-          } else {
-            console.log('[콜백 백엔드] 신규 유저 프로필 생성 완료:', user.email)
           }
-          profile = { role: 'doctor' }
+          // 신규 가입 → 닉네임 입력 페이지
+          return NextResponse.redirect(new URL('/setup', origin))
+        }
+
+        // 기존 유저인데 닉네임 미설정 상태면 다시 setup으로
+        const { data: fullProfile } = await supabase
+          .from('profiles')
+          .select('role, name')
+          .eq('id', user.id)
+          .single() as any
+
+        if (fullProfile?.name === '__pending__' && fullProfile?.role === 'doctor') {
+          return NextResponse.redirect(new URL('/setup', origin))
         }
 
         const redirectMap: Record<string, string> = {
@@ -41,7 +51,7 @@ export async function GET(request: Request) {
           doctor: '/doctor',
           vendor: '/vendor',
         }
-        const dest = redirectMap[profile.role] ?? '/doctor'
+        const dest = redirectMap[fullProfile?.role ?? 'doctor'] ?? '/doctor'
         return NextResponse.redirect(new URL(dest, origin))
       }
     }

@@ -37,6 +37,23 @@ export default async function DoctorPage() {
     vendorsByStage[v.category_id].push(v)
   }
 
+  // 내 미팅 목록
+  const { data: meetingsRaw } = await (supabase
+    .from('meeting_requests')
+    .select(`
+      id, status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
+      stage:stages(name, color),
+      vendor:vendors(company_name, rep_name)
+    `)
+    .eq('doctor_id', user.id)
+    .order('created_at', { ascending: false }) as any)
+
+  const meetings = ((meetingsRaw as any[]) ?? []).map((m: any) => ({
+    ...m,
+    stage: Array.isArray(m.stage) ? m.stage[0] : m.stage,
+    vendor: Array.isArray(m.vendor) ? m.vendor[0] : m.vendor,
+  }))
+
   return (
     <main className="gradient-bg min-h-screen p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -45,6 +62,7 @@ export default async function DoctorPage() {
           vendorsByStage={vendorsByStage as any}
           doctorId={user.id}
           doctorName={profile.name}
+          meetings={meetings as any}
         />
       </div>
     </main>

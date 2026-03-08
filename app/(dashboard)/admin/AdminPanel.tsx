@@ -49,6 +49,10 @@ export default function AdminPanel() {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [availableProfiles, setAvailableProfiles] = useState<{ id: string; name: string; email: string; role: string }[]>([])
   const [profilesLoading, setProfilesLoading] = useState(false)
+  const [calendarEnabled, setCalendarEnabled] = useState<boolean | null>(null)
+  const [calendarToggling, setCalendarToggling] = useState(false)
+  const [calendarTestResult, setCalendarTestResult] = useState<{ ok: boolean; steps: { step: string; status: 'ok' | 'fail'; detail?: string }[] } | null>(null)
+  const [calendarTesting, setCalendarTesting] = useState(false)
 
   const loadStages = useCallback(async () => {
     const res = await fetch('/api/admin/stages')
@@ -66,6 +70,36 @@ export default function AdminPanel() {
   useEffect(() => {
     if (tab === 'vendors') loadVendors(selectedStage?.id)
   }, [tab, selectedStage, loadVendors])
+
+  // 앱 설정 로드
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(d => setCalendarEnabled(d.calendar_enabled !== 'false'))
+      .catch(() => setCalendarEnabled(true))
+  }, [])
+
+  async function testCalendar() {
+    setCalendarTesting(true)
+    setCalendarTestResult(null)
+    const res = await fetch('/api/admin/test-calendar')
+    const data = await res.json()
+    setCalendarTestResult(data)
+    setCalendarTesting(false)
+  }
+
+  async function toggleCalendar() {
+    if (calendarEnabled === null) return
+    setCalendarToggling(true)
+    const next = !calendarEnabled
+    await fetch('/api/admin/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'calendar_enabled', value: String(next) }),
+    })
+    setCalendarEnabled(next)
+    setCalendarToggling(false)
+  }
 
   // ── 단계 저장 ──
   async function saveStage() {
@@ -170,15 +204,72 @@ export default function AdminPanel() {
   return (
     <div className="space-y-5">
       {/* 헤더 */}
-      <div className="glass rounded-2xl px-6 py-4 flex items-center justify-between">
+      <div className="glass rounded-2xl px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--brand-primary)' }}>관리자 패널</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>개원 단계 및 제휴업체 관리</p>
         </div>
-        <div className="text-sm px-3 py-1.5 rounded-full font-medium text-white" style={{ background: '#6366f1' }}>
-          관리자
+        <div className="flex items-center gap-4">
+          {/* 구글 캘린더 연동 토글 */}
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                📅 구글 캘린더 연동
+              </p>
+              <p className="text-xs" style={{ color: calendarEnabled ? '#16a34a' : 'var(--text-muted)' }}>
+                {calendarEnabled === null ? '...' : calendarEnabled ? '활성화됨' : '비활성화됨'}
+              </p>
+            </div>
+            <button
+              onClick={toggleCalendar}
+              disabled={calendarToggling || calendarEnabled === null}
+              className="relative w-12 h-6 rounded-full transition-all duration-300 disabled:opacity-50"
+              style={{ background: calendarEnabled ? '#16a34a' : '#d1d5db' }}>
+              <span
+                className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-300"
+                style={{ transform: calendarEnabled ? 'translateX(24px)' : 'translateX(0)' }}
+              />
+            </button>
+            <button
+              onClick={testCalendar}
+              disabled={calendarTesting}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-80 disabled:opacity-50"
+              style={{ background: 'var(--bg-muted)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
+              {calendarTesting ? '진단 중...' : '🔍 진단'}
+            </button>
+          </div>
+          <div className="text-sm px-3 py-1.5 rounded-full font-medium text-white" style={{ background: '#6366f1' }}>
+            관리자
+          </div>
         </div>
       </div>
+
+      {/* 캘린더 진단 결과 */}
+      {calendarTestResult && (
+        <div className="glass rounded-2xl p-5 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold" style={{ color: calendarTestResult.ok ? '#16a34a' : '#dc2626' }}>
+              {calendarTestResult.ok ? '✅ 캘린더 연동 정상' : '❌ 캘린더 연동 오류'}
+            </p>
+            <button onClick={() => setCalendarTestResult(null)}
+              className="text-xs" style={{ color: 'var(--text-muted)' }}>닫기</button>
+          </div>
+          {calendarTestResult.steps.map((s, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs p-2 rounded-lg"
+              style={{ background: s.status === 'ok' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)' }}>
+              <span>{s.status === 'ok' ? '✅' : '❌'}</span>
+              <div>
+                <p className="font-semibold" style={{ color: s.status === 'ok' ? '#16a34a' : '#dc2626' }}>
+                  {s.step}
+                </p>
+                {s.detail && (
+                  <p className="mt-0.5 break-all" style={{ color: 'var(--text-secondary)' }}>{s.detail}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 탭 */}
       <div className="flex gap-2 flex-wrap">

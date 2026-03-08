@@ -43,16 +43,20 @@ export default async function VendorPage() {
   }
 
   // 미팅 요청 전체 조회 (이 벤더사에게 온 것)
-  const { data: meetings } = await (supabase
+  // doctor_info는 profiles → doctors 중첩 조인으로 가져옴 (직접 FK 없음)
+  const { data: meetings, error: meetingsError } = await (supabase
     .from('meeting_requests')
     .select(`
-      id, status, proposed_times, confirmed_time, meet_link, note, created_at,
+      id, status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
       stage:stages(name, color, icon),
-      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name),
-      doctor_info:doctors(clinic_name)
+      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, doctors(clinic_name))
     `)
     .eq('vendor_id', vendor.id)
     .order('created_at', { ascending: false }) as any)
+
+  if (meetingsError) {
+    console.error('[vendor/page] meetings query error:', meetingsError)
+  }
 
   // 필터 드롭다운용 단계 목록
   const { data: stages } = await (supabase
@@ -61,12 +65,20 @@ export default async function VendorPage() {
     .order('order_index') as any)
 
   // 타입 정규화
-  const normalizedMeetings = ((meetings as any[]) ?? []).map((m: any) => ({
-    ...m,
-    stage: Array.isArray(m.stage) ? m.stage[0] : m.stage,
-    doctor_profile: Array.isArray(m.doctor_profile) ? m.doctor_profile[0] : m.doctor_profile,
-    doctor_info: Array.isArray(m.doctor_info) ? (m.doctor_info[0] ?? null) : m.doctor_info,
-  }))
+  const normalizedMeetings = ((meetings as any[]) ?? []).map((m: any) => {
+    const stage = Array.isArray(m.stage) ? m.stage[0] : m.stage
+    const rawProfile = Array.isArray(m.doctor_profile) ? m.doctor_profile[0] : m.doctor_profile
+    const doctorsDirect = rawProfile?.doctors
+    const doctorInfo = Array.isArray(doctorsDirect)
+      ? (doctorsDirect[0] ?? null)
+      : (doctorsDirect ?? null)
+    return {
+      ...m,
+      stage,
+      doctor_profile: rawProfile ? { name: rawProfile.name ?? '알 수 없음' } : { name: '알 수 없음' },
+      doctor_info: doctorInfo,
+    }
+  })
 
   return (
     <main className="gradient-bg min-h-screen p-4 sm:p-6">

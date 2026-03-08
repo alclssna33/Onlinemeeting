@@ -29,13 +29,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '미팅 요청을 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    const vendor = meeting.vendor as any
-    const stage = meeting.stage as any
-    const doctorProfile = meeting.doctor_profile as any
+    const vendor = Array.isArray(meeting.vendor) ? meeting.vendor[0] : meeting.vendor
+    const stage = Array.isArray(meeting.stage) ? meeting.stage[0] : meeting.stage
+    const doctorProfile = Array.isArray(meeting.doctor_profile) ? meeting.doctor_profile[0] : meeting.doctor_profile
 
     if (!vendor?.email) {
-      // 벤더사 이메일 없으면 스킵 (에러는 아님)
-      return NextResponse.json({ ok: true, skipped: true })
+      console.warn('[notify] 벤더사 이메일 없음 - 스킵. vendor:', vendor)
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no vendor email' })
     }
 
     await notifyVendorMeetingRequest({

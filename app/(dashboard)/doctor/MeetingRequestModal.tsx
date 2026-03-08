@@ -95,7 +95,10 @@ export default function MeetingRequestModal({ vendor, stage, doctorId, onClose }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: inserted.id }),
-      }).catch(err => console.error('[notify]', err))
+      })
+        .then(r => r.json())
+        .then(d => console.log('[notify] result:', d))
+        .catch(err => console.error('[notify] error:', err))
     }
 
     setLoading(false)

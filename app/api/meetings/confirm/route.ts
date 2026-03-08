@@ -7,7 +7,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notifyDoctorMeetingConfirmed } from '@/lib/email'
+import { createMeetSpace } from '@/lib/google-meet'
 import { createMeetingEvent } from '@/lib/google-calendar'
 
 export async function POST(req: NextRequest) {
@@ -48,28 +50,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이미 처리된 요청입니다.' }, { status: 409 })
     }
 
-    const stage = meeting.stage as any
-    const doctorProfile = meeting.doctor_profile as any
+    const stage = Array.isArray(meeting.stage) ? meeting.stage[0] : meeting.stage
+    const doctorProfile = Array.isArray(meeting.doctor_profile) ? meeting.doctor_profile[0] : meeting.doctor_profile
 
-    // ── Google Calendar 일정 생성 ──────────────────────────────
+    // ── 1. Google Meet 링크 생성 (캘린더와 무관) ─────────────────
     let meetLink: string | null = null
-    let calendarEventId: string | null = null
+    meetLink = await createMeetSpace()  // 실패 시 null 반환 (non-blocking)
 
-    try {
+    // ── 2. Google Calendar 일정 생성 (선택, 토글 ON일 때만) ──────
+    const adminClient = createAdminClient()
+    const { data: calSetting } = await (adminClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'calendar_enabled')
+      .single() as any)
+    const calendarEnabled = calSetting?.value !== 'false'
+
+    let calendarEventId: string | null = null
+    if (calendarEnabled) try {
       const attendees = [doctorProfile?.email, vendor.email].filter(Boolean)
       const noteText = meeting.note ? `\n원장님 전달사항: ${meeting.note}` : ''
-      const { eventId, meetLink: link } = await createMeetingEvent({
+      const { eventId } = await createMeetingEvent({
         title: `[개비공] ${doctorProfile?.name ?? '원장님'} × ${vendor.company_name}`,
         description: `개원 단계: ${stage?.name}\n참석: ${doctorProfile?.name} 원장님, ${vendor.company_name}${noteText}`,
         startTime: confirmedTime,
         durationMinutes: 60,
         attendeeEmails: attendees,
       })
-      meetLink = link
       calendarEventId = eventId
-      console.log('[confirm] 캘린더 이벤트 생성 완료:', eventId, meetLink)
+      console.log('[confirm] 캘린더 이벤트 생성 완료:', eventId)
     } catch (calErr: any) {
-      // 캘린더 생성 실패해도 미팅 확정은 진행 (non-blocking)
       console.error('[confirm] 캘린더 생성 실패 (non-blocking):', calErr.message)
     }
 

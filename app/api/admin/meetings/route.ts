@@ -21,21 +21,27 @@ export async function GET() {
     .select(`
       id, status, confirmed_time, meet_link, created_at, note, vendor_note,
       stage:stages(name, color),
-      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, email),
-      doctor_info:doctors(clinic_name),
+      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, email, doctors(clinic_name)),
       vendor:vendors(company_name, rep_name, email)
     `)
     .order('created_at', { ascending: false }) as any)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const normalized = (data ?? []).map((m: any) => ({
-    ...m,
-    stage: Array.isArray(m.stage) ? m.stage[0] : m.stage,
-    doctor_profile: Array.isArray(m.doctor_profile) ? m.doctor_profile[0] : m.doctor_profile,
-    doctor_info: Array.isArray(m.doctor_info) ? (m.doctor_info[0] ?? null) : m.doctor_info,
-    vendor: Array.isArray(m.vendor) ? m.vendor[0] : m.vendor,
-  }))
+  const normalized = (data ?? []).map((m: any) => {
+    const doctorProfile = Array.isArray(m.doctor_profile) ? m.doctor_profile[0] : m.doctor_profile
+    const doctorsDirect = doctorProfile?.doctors
+    const doctorInfo = Array.isArray(doctorsDirect)
+      ? (doctorsDirect[0] ?? null)
+      : (doctorsDirect ?? null)
+    return {
+      ...m,
+      stage: Array.isArray(m.stage) ? m.stage[0] : m.stage,
+      doctor_profile: doctorProfile ? { name: doctorProfile.name, email: doctorProfile.email } : null,
+      doctor_info: doctorInfo,
+      vendor: Array.isArray(m.vendor) ? m.vendor[0] : m.vendor,
+    }
+  })
 
   return NextResponse.json(normalized)
 }

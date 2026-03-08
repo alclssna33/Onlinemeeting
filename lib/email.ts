@@ -44,11 +44,21 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    redirect: 'follow',
   })
+
+  const contentType = res.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    const text = await res.text()
+    console.error('[email] GAS가 JSON이 아닌 응답 반환:', res.status, text.slice(0, 200))
+    throw new Error(`GAS 응답 오류 (status: ${res.status}) — GAS 스크립트 권한 승인이 필요할 수 있습니다.`)
+  }
+
   const result = await res.json()
   if (!result.success) {
     throw new Error(`[email] GAS 발송 실패: ${result.error}`)
   }
+  console.log('[email] 발송 완료:', payload.type)
 }
 
 /** 원장 → 벤더사 미팅 요청 시 벤더사에게 알림 */

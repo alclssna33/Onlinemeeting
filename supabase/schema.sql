@@ -125,7 +125,7 @@ CREATE TABLE doctor_progress (
 CREATE TABLE meeting_requests (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   doctor_id           UUID NOT NULL REFERENCES profiles(id),
-  vendor_id           UUID NOT NULL REFERENCES profiles(id),
+  vendor_id           UUID NOT NULL REFERENCES vendors(id),
   stage_id            INTEGER NOT NULL REFERENCES stages(id),
   status              meeting_status NOT NULL DEFAULT 'pending',
   proposed_times      TIMESTAMPTZ[] NOT NULL,   -- 최대 5개
@@ -187,11 +187,16 @@ CREATE POLICY "doctor_progress: 본인 수정" ON doctor_progress
 
 -- meeting_requests: 관련 당사자(doctor/vendor) 조회, 생성
 CREATE POLICY "meeting_requests: 당사자 조회" ON meeting_requests
-  FOR SELECT USING (auth.uid() = doctor_id OR auth.uid() = vendor_id);
+  FOR SELECT USING (
+    auth.uid() = doctor_id
+    OR auth.uid() = (SELECT profile_id FROM vendors WHERE id = vendor_id)
+  );
 CREATE POLICY "meeting_requests: doctor 생성" ON meeting_requests
   FOR INSERT WITH CHECK (auth.uid() = doctor_id);
 CREATE POLICY "meeting_requests: vendor 상태 변경" ON meeting_requests
-  FOR UPDATE USING (auth.uid() = vendor_id);
+  FOR UPDATE USING (
+    auth.uid() = (SELECT profile_id FROM vendors WHERE id = vendor_id)
+  );
 CREATE POLICY "meeting_requests: admin 전체" ON meeting_requests
   FOR ALL USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')

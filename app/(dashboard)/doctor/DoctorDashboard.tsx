@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MeetingRequestModal from './MeetingRequestModal'
+import DoctorMeetings from './DoctorMeetings'
 
 type Stage = {
   id: number
@@ -22,39 +23,114 @@ type Vendor = {
   phone: string | null
 }
 
+type Meeting = {
+  id: string
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled'
+  proposed_times: string[]
+  confirmed_time: string | null
+  meet_link: string | null
+  note: string | null
+  vendor_note: string | null
+  created_at: string
+  stage: { name: string; color: string }
+  vendor: { company_name: string; rep_name: string | null }
+}
+
 type Props = {
   stages: Stage[]
   vendorsByStage: Record<number, Vendor[]>
   doctorId: string
   doctorName: string
+  meetings: Meeting[]
 }
 
-export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doctorName }: Props) {
+export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doctorName, meetings }: Props) {
+  const [tab, setTab] = useState<'vendors' | 'meetings'>('vendors')
   const [selectedStage, setSelectedStage] = useState<Stage>(stages[0])
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
+
+  const pendingCount = meetings.filter(m => m.status === 'pending').length
+  const confirmedCount = meetings.filter(m => m.status === 'confirmed').length
 
   const vendors = vendorsByStage[selectedStage?.id] ?? []
 
   return (
     <div className="flex flex-col gap-6">
       {/* 상단 헤더 */}
-      <div className="glass rounded-2xl px-6 py-4 flex items-center justify-between">
+      <div className="glass rounded-2xl px-6 py-4 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--brand-primary)' }}>
             개비공 — 온라인 미팅 시스템
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            안녕하세요, <span className="font-semibold">{doctorName}</span>님
+            안녕하세요,{' '}
+            <span className="font-semibold">
+              {doctorName && doctorName !== '__pending__' ? doctorName : '?'}
+            </span>
+            {' '}원장님
           </p>
         </div>
-        <div className="text-sm px-3 py-1.5 rounded-full font-medium"
-          style={{ background: 'var(--brand-primary)', color: '#fff' }}>
-          원장님
+        <div className="flex items-center gap-2">
+          {(!doctorName || doctorName === '__pending__') && (
+            <a href="/setup"
+              className="text-xs px-3 py-1.5 rounded-xl font-semibold animate-pulse"
+              style={{ background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' }}>
+              닉네임 설정 필요
+            </a>
+          )}
+          <a href="/setup"
+            className="text-xs px-3 py-1.5 rounded-xl font-medium transition-all hover:opacity-80"
+            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-default)' }}>
+            ✏️ 닉네임 변경
+          </a>
+          <div className="text-sm px-3 py-1.5 rounded-full font-medium"
+            style={{ background: 'var(--brand-primary)', color: '#fff' }}>
+            원장님
+          </div>
         </div>
       </div>
 
+      {/* 탭 */}
+      <div className="flex gap-2">
+        <button onClick={() => setTab('vendors')}
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={{
+            background: tab === 'vendors' ? 'var(--brand-primary)' : 'var(--glass-bg)',
+            color: tab === 'vendors' ? '#fff' : 'var(--text-primary)',
+            border: `1px solid ${tab === 'vendors' ? 'var(--brand-primary)' : 'var(--border-default)'}`,
+          }}>
+          🏢 업체 찾기
+        </button>
+        <button onClick={() => setTab('meetings')}
+          className="relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={{
+            background: tab === 'meetings' ? 'var(--brand-primary)' : 'var(--glass-bg)',
+            color: tab === 'meetings' ? '#fff' : 'var(--text-primary)',
+            border: `1px solid ${tab === 'meetings' ? 'var(--brand-primary)' : 'var(--border-default)'}`,
+          }}>
+          📅 내 미팅
+          {pendingCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+              style={{ background: '#f59e0b', color: '#fff' }}>
+              {pendingCount}
+            </span>
+          )}
+          {confirmedCount > 0 && pendingCount === 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+              style={{ background: '#16a34a', color: '#fff' }}>
+              {confirmedCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* 내 미팅 탭 */}
+      {tab === 'meetings' && (
+        <DoctorMeetings meetings={meetings} />
+      )}
+
       {/* 메인 2단 레이아웃 */}
-      <div className="flex gap-4 min-h-[600px]">
+      {tab === 'vendors' && <div className="flex gap-4 min-h-[600px]">
 
         {/* 좌측: 개원 단계 카테고리 */}
         <div className="w-56 shrink-0 flex flex-col gap-2">
@@ -175,7 +251,7 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
             </motion.div>
           </AnimatePresence>
         </div>
-      </div>
+      </div>}
 
       {/* 미팅 신청 모달 */}
       {selectedVendor && (

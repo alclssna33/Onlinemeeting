@@ -63,11 +63,12 @@ const STATUS_BG: Record<MeetingStatus, string> = {
 }
 
 // ── 개별 미팅 카드 ────────────────────────────────────────────
-function MeetingCard({ meeting, onConfirm, onReject, loading }: {
+function MeetingCard({ meeting, onConfirm, onReject, loading, overrideMeetLink }: {
   meeting: Meeting
   onConfirm: (id: string, time: string) => void
   onReject: (id: string, note: string) => void
   loading: string | null
+  overrideMeetLink?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -75,6 +76,7 @@ function MeetingCard({ meeting, onConfirm, onReject, loading }: {
   const [rejectNote, setRejectNote] = useState('')
   const isLoading = loading === meeting.id
   const clinicName = meeting.doctor_info?.clinic_name
+  const meetLink = overrideMeetLink ?? meeting.meet_link
 
   return (
     <motion.div
@@ -98,7 +100,7 @@ function MeetingCard({ meeting, onConfirm, onReject, loading }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-              {meeting.doctor_profile.name} 원장님
+              {meeting.doctor_profile?.name ?? '원장님'} 원장님
             </span>
             {clinicName && (
               <span className="text-xs px-2 py-0.5 rounded-full"
@@ -153,8 +155,8 @@ function MeetingCard({ meeting, onConfirm, onReject, loading }: {
               {formatDate(meeting.confirmed_time!)}
             </span>
           </div>
-          {meeting.meet_link ? (
-            <a href={meeting.meet_link} target="_blank" rel="noopener noreferrer"
+          {meetLink ? (
+            <a href={meetLink} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold transition-all hover:opacity-80"
               style={{ background: '#1a73e8', color: '#fff' }}>
               🎥 Google Meet 입장
@@ -302,6 +304,9 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
   const [search, setSearch] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  // 확정 직후 즉시 표시할 meetLink (router.refresh 대기 없이)
+  const [confirmedLinks, setConfirmedLinks] = useState<Record<string, string>>({})
+
 
   // ── 통계 ──
   const stats = useMemo(() => ({
@@ -327,7 +332,7 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(m =>
-        m.doctor_profile.name.toLowerCase().includes(q) ||
+        (m.doctor_profile?.name ?? '').toLowerCase().includes(q) ||
         (m.doctor_info?.clinic_name?.toLowerCase().includes(q) ?? false)
       )
     }
@@ -350,10 +355,14 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, confirmedTime }),
       })
+      const data = await res.json()
       if (!res.ok) {
-        const data = await res.json()
         alert('오류: ' + data.error)
         return
+      }
+      // 응답에서 meetLink를 즉시 반영 (router.refresh 전에도 표시)
+      if (data.meetLink) {
+        setConfirmedLinks(prev => ({ ...prev, [requestId]: data.meetLink }))
       }
       startTransition(() => router.refresh())
     } catch (err) {
@@ -529,6 +538,7 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
                 onConfirm={handleConfirm}
                 onReject={handleReject}
                 loading={loadingId}
+                overrideMeetLink={confirmedLinks[meeting.id]}
               />
             ))}
           </AnimatePresence>

@@ -70,10 +70,10 @@ export default function MeetingMonitor() {
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(m =>
-        m.doctor_profile.name.toLowerCase().includes(q) ||
-        m.vendor.company_name.toLowerCase().includes(q) ||
+        (m.doctor_profile?.name ?? '').toLowerCase().includes(q) ||
+        (m.vendor?.company_name ?? '').toLowerCase().includes(q) ||
         (m.doctor_info?.clinic_name?.toLowerCase().includes(q) ?? false) ||
-        m.stage.name.toLowerCase().includes(q)
+        (m.stage?.name ?? '').toLowerCase().includes(q)
       )
     }
     return list
@@ -185,15 +185,15 @@ export default function MeetingMonitor() {
                     {/* 단계 */}
                     <td className="px-4 py-3">
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: m.stage.color + '22', color: m.stage.color }}>
-                        {m.stage.name}
+                        style={{ background: (m.stage?.color ?? '#888') + '22', color: m.stage?.color ?? '#888' }}>
+                        {m.stage?.name ?? '-'}
                       </span>
                     </td>
 
                     {/* 원장님 */}
                     <td className="px-4 py-3">
                       <p className="font-medium text-xs" style={{ color: 'var(--text-primary)' }}>
-                        {m.doctor_profile.name} 원장님
+                        {m.doctor_profile?.name ?? '알 수 없음'} 원장님
                       </p>
                       {m.doctor_info?.clinic_name && (
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -205,9 +205,9 @@ export default function MeetingMonitor() {
                     {/* 업체 */}
                     <td className="px-4 py-3">
                       <p className="font-medium text-xs" style={{ color: 'var(--text-primary)' }}>
-                        {m.vendor.company_name}
+                        {m.vendor?.company_name ?? '알 수 없음'}
                       </p>
-                      {m.vendor.rep_name && (
+                      {m.vendor?.rep_name && (
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                           {m.vendor.rep_name}
                         </p>
