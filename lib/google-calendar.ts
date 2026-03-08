@@ -8,15 +8,15 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!
-  // .env의 \n 이스케이프를 실제 줄바꿈으로 변환
   const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY!.replace(/\\n/g, '\n')
-  const calendarOwner = process.env.GOOGLE_CALENDAR_ID!
+  // DWD subject: 워크스페이스 사용자 이메일 (GOOGLE_CALENDAR_OWNER 우선, 없으면 GOOGLE_CALENDAR_ID)
+  const subject = process.env.GOOGLE_CALENDAR_OWNER || process.env.GOOGLE_CALENDAR_ID!
 
   return new google.auth.JWT({
     email,
     key: privateKey,
     scopes: SCOPES,
-    subject: calendarOwner, // 캘린더 소유자 대신 행동 (Domain-Wide Delegation)
+    subject,
   })
 }
 

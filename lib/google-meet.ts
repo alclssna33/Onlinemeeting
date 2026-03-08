@@ -10,7 +10,7 @@ import { google } from 'googleapis'
 function getMeetAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!
   const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY!.replace(/\\n/g, '\n')
-  const subject = process.env.GOOGLE_CALENDAR_ID! // Workspace 사용자 이메일 (DWD subject)
+  const subject = process.env.GOOGLE_CALENDAR_OWNER || process.env.GOOGLE_CALENDAR_ID! // Workspace 사용자 이메일 (DWD subject)
 
   return new google.auth.JWT({
     email,

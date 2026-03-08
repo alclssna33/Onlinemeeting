@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import VendorInbox from './VendorInbox'
 
@@ -42,9 +43,9 @@ export default async function VendorPage() {
     )
   }
 
-  // 미팅 요청 전체 조회 (이 벤더사에게 온 것)
-  // doctor_info는 profiles → doctors 중첩 조인으로 가져옴 (직접 FK 없음)
-  const { data: meetings, error: meetingsError } = await (supabase
+  // 미팅 요청 전체 조회 — admin client로 RLS 우회 (doctor 닉네임 정확히 표시)
+  const adminClient = createAdminClient()
+  const { data: meetings, error: meetingsError } = await (adminClient
     .from('meeting_requests')
     .select(`
       id, status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
