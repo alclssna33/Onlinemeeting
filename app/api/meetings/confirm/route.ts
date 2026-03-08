@@ -34,11 +34,7 @@ export async function POST(req: NextRequest) {
 
     const { data: meeting, error: fetchError } = await (supabase
       .from('meeting_requests')
-      .select(`
-        id, status, vendor_id, note,
-        stage:stages(name),
-        doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, email)
-      `)
+      .select(`id, status, vendor_id, doctor_id, note, stage:stages(name)`)
       .eq('id', requestId)
       .eq('vendor_id', vendor.id)
       .single() as any)
@@ -51,7 +47,13 @@ export async function POST(req: NextRequest) {
     }
 
     const stage = Array.isArray(meeting.stage) ? meeting.stage[0] : meeting.stage
-    const doctorProfile = Array.isArray(meeting.doctor_profile) ? meeting.doctor_profile[0] : meeting.doctor_profile
+
+    // 원장 프로필 admin client로 조회 (RLS 우회)
+    const { data: doctorProfile } = await (createAdminClient()
+      .from('profiles')
+      .select('name, email')
+      .eq('id', meeting.doctor_id)
+      .single() as any)
 
     // ── 1. Google Meet 링크 생성 (캘린더와 무관) ─────────────────
     let meetLink: string | null = null
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
       calendarEventId = eventId
       console.log('[confirm] 캘린더 이벤트 생성 완료:', eventId)
     } catch (calErr: any) {
-      console.error('[confirm] 캘린더 생성 실패 (non-blocking):', calErr.message)
+      console.error('[confirm] 캘린더 생성 실패 (non-blocking):', calErr.message ?? calErr)
     }
 
     // ── DB 업데이트 ──────────────────────────────────────────

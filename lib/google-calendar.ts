@@ -47,29 +47,18 @@ export async function createMeetingEvent(
 
   const event = await calendar.events.insert({
     calendarId,
-    conferenceDataVersion: 1, // Google Meet 링크 생성
     requestBody: {
       summary: title,
       description,
       start: { dateTime: start.toISOString(), timeZone: 'Asia/Seoul' },
       end: { dateTime: end.toISOString(), timeZone: 'Asia/Seoul' },
       attendees: attendeeEmails.map(email => ({ email })),
-      conferenceData: {
-        createRequest: {
-          requestId: `gaebigong-${Date.now()}`,
-          conferenceSolutionKey: { type: 'hangoutsMeet' },
-        },
-      },
     },
   })
 
-  const eventData = event.data
-  const meetLink =
-    eventData.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'video')?.uri ?? null
-
   return {
-    eventId: eventData.id!,
-    meetLink,
+    eventId: event.data.id!,
+    meetLink: null,
   }
 }
 
