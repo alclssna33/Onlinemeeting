@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import MeetingMonitor from './MeetingMonitor'
 
 type Stage = { id: number; name: string; color: string; order_index: number; description: string | null }
 type LinkedProfile = { name: string; email: string } | null
@@ -26,7 +27,7 @@ const VENDOR_JOIN_URL = typeof window !== 'undefined'
   : '/join/vendor'
 
 export default function AdminPanel() {
-  const [tab, setTab] = useState<'stages' | 'vendors'>('stages')
+  const [tab, setTab] = useState<'stages' | 'vendors' | 'meetings'>('stages')
   const [stages, setStages] = useState<Stage[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null)
@@ -46,6 +47,8 @@ export default function AdminPanel() {
   const [linkLoading, setLinkLoading] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [availableProfiles, setAvailableProfiles] = useState<{ id: string; name: string; email: string; role: string }[]>([])
+  const [profilesLoading, setProfilesLoading] = useState(false)
 
   const loadStages = useCallback(async () => {
     const res = await fetch('/api/admin/stages')
@@ -115,6 +118,15 @@ export default function AdminPanel() {
     await loadVendors(selectedStage?.id)
   }
 
+  // ── 연결 가능한 프로필 목록 로드 ──
+  async function loadAvailableProfiles() {
+    setProfilesLoading(true)
+    const res = await fetch('/api/admin/profiles')
+    const data = await res.json()
+    setAvailableProfiles(Array.isArray(data) ? data : [])
+    setProfilesLoading(false)
+  }
+
   // ── 계정 연결 ──
   async function handleLink() {
     if (!linkingVendor || !linkEmail.trim()) return
@@ -169,16 +181,20 @@ export default function AdminPanel() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-2">
-        {(['stages', 'vendors'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { key: 'stages', label: '🗂 개원 단계 관리' },
+          { key: 'vendors', label: '🏢 제휴업체 관리' },
+          { key: 'meetings', label: '📅 미팅 현황' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
             style={{
-              background: tab === t ? 'var(--brand-primary)' : 'var(--glass-bg)',
-              color: tab === t ? '#fff' : 'var(--text-primary)',
-              border: `1px solid ${tab === t ? 'var(--brand-primary)' : 'var(--border-default)'}`,
+              background: tab === t.key ? 'var(--brand-primary)' : 'var(--glass-bg)',
+              color: tab === t.key ? '#fff' : 'var(--text-primary)',
+              border: `1px solid ${tab === t.key ? 'var(--brand-primary)' : 'var(--border-default)'}`,
             }}>
-            {t === 'stages' ? '🗂 개원 단계 관리' : '🏢 제휴업체 관리'}
+            {t.label}
           </button>
         ))}
       </div>
@@ -317,7 +333,7 @@ export default function AdminPanel() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => { setLinkingVendor(vendor); setLinkEmail(''); setLinkError(null) }}
+                          onClick={() => { setLinkingVendor(vendor); setLinkEmail(''); setLinkError(null); loadAvailableProfiles() }}
                           className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-80"
                           style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)' }}>
                           🔗 계정 연결
@@ -348,6 +364,9 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* ── 미팅 현황 탭 ── */}
+      {tab === 'meetings' && <MeetingMonitor />}
+
       {/* ── 계정 연결 모달 ── */}
       <AnimatePresence>
         {linkingVendor && (
@@ -371,24 +390,56 @@ export default function AdminPanel() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  담당자 구글 계정 이메일
+                  담당자 구글 계정 선택
                 </label>
-                <input
-                  type="email"
-                  placeholder="example@gmail.com"
-                  value={linkEmail}
-                  onChange={e => setLinkEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleLink()}
-                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
-                  style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
-                  autoFocus
-                />
+
+                {profilesLoading ? (
+                  <p className="text-sm py-2" style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
+                ) : availableProfiles.length > 0 ? (
+                  <>
+                    <select
+                      value={linkEmail}
+                      onChange={e => setLinkEmail(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
+                      style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)', color: linkEmail ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      <option value="">-- 가입한 계정 선택 --</option>
+                      {availableProfiles.map(p => (
+                        <option key={p.id} value={p.email}>
+                          {p.name} ({p.email}) {p.role === 'vendor' ? '· 벤더' : '· 일반'}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      목록에 없으면 아래에 직접 입력하세요.
+                    </p>
+                    <input
+                      type="email"
+                      placeholder="직접 입력: example@gmail.com"
+                      value={linkEmail}
+                      onChange={e => setLinkEmail(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleLink()}
+                      className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
+                      style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+                    />
+                  </>
+                ) : (
+                  <input
+                    type="email"
+                    placeholder="example@gmail.com"
+                    value={linkEmail}
+                    onChange={e => setLinkEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLink()}
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
+                    style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+                    autoFocus
+                  />
+                )}
+
                 {linkError && (
                   <p className="text-xs" style={{ color: '#dc2626' }}>⚠️ {linkError}</p>
                 )}
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  담당자가 <strong>/join/vendor</strong> 링크로 먼저 가입해야 합니다.<br />
-                  가입 후 사용한 구글 이메일을 입력하세요.
+                  담당자가 <strong>/join/vendor</strong> 링크로 먼저 가입해야 목록에 나타납니다.
                 </p>
               </div>
 
