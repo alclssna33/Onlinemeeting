@@ -4,8 +4,10 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET() {
+  // 인증·권한 확인은 유저 세션으로
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -16,7 +18,9 @@ export async function GET() {
     return NextResponse.json({ error: '관리자 권한 필요' }, { status: 403 })
   }
 
-  const { data, error } = await (supabase
+  // 데이터 조회는 adminClient로 — RLS 우회하여 전체 미팅 + 정확한 닉네임 조회
+  const adminClient = createAdminClient()
+  const { data, error } = await (adminClient
     .from('meeting_requests')
     .select(`
       id, status, confirmed_time, meet_link, created_at, note, vendor_note,
