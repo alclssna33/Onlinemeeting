@@ -87,14 +87,6 @@ export default function MeetingMonitor() {
     { key: 'rejected', label: '거절', count: stats.rejected },
   ]
 
-  if (loading) {
-    return (
-      <div className="glass rounded-2xl p-10 text-center">
-        <p style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
-      </div>
-    )
-  }
-
   const calendarMeetings = useMemo(() =>
     meetings
       .filter(m => m.status === 'confirmed' && m.confirmed_time)
@@ -105,6 +97,14 @@ export default function MeetingMonitor() {
       })),
     [meetings]
   )
+
+  if (loading) {
+    return (
+      <div className="glass rounded-2xl p-10 text-center">
+        <p style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
