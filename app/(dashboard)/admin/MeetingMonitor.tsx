@@ -4,10 +4,12 @@ import { useState, useEffect, useMemo } from 'react'
 import MiniCalendar from '@/app/components/MiniCalendar'
 
 type MeetingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled'
+type MeetingType = 'standard' | 'express'
 
 type Meeting = {
   id: string
   status: MeetingStatus
+  meeting_type: MeetingType
   confirmed_time: string | null
   meet_link: string | null
   created_at: string
@@ -46,16 +48,25 @@ function formatDate(iso: string) {
   })
 }
 
-export default function MeetingMonitor() {
-  const [meetings, setMeetings] = useState<Meeting[]>([])
+type Props = {
+  meetingType?: 'standard' | 'express'  // undefined = 전체
+}
+
+export default function MeetingMonitor({ meetingType }: Props) {
+  const [allMeetings, setAllMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'all' | MeetingStatus>('all')
   const [search, setSearch] = useState('')
 
+  // meetingType prop으로 사전 필터링
+  const meetings = meetingType
+    ? allMeetings.filter(m => m.meeting_type === meetingType)
+    : allMeetings
+
   useEffect(() => {
     fetch('/api/admin/meetings')
       .then(r => r.json())
-      .then(data => { setMeetings(Array.isArray(data) ? data : []); setLoading(false) })
+      .then(data => { setAllMeetings(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -186,10 +197,18 @@ export default function MeetingMonitor() {
                     }}>
                     {/* 상태 */}
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                        style={{ background: STATUS_BG[m.status], color: STATUS_COLOR[m.status] }}>
-                        {STATUS_LABEL[m.status]}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full w-fit"
+                          style={{ background: STATUS_BG[m.status], color: STATUS_COLOR[m.status] }}>
+                          {STATUS_LABEL[m.status]}
+                        </span>
+                        {m.meeting_type === 'express' && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full w-fit"
+                            style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+                            ⚡ 일사천리
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* 신청일 */}

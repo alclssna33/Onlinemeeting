@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
@@ -18,11 +18,15 @@ export async function GET() {
     return NextResponse.json({ error: '관리자 권한 필요' }, { status: 403 })
   }
 
+  const { searchParams } = new URL(req.url)
+  const target = searchParams.get('target') // 'bidding' | null(=일반 vendor)
+
   const adminSupabase = createAdminClient()
 
-  // 이미 연결된 profile_id 목록
+  // target에 따라 이미 연결된 profile_id 목록을 다른 테이블에서 조회
+  const tableName = target === 'bidding' ? 'bidding_vendors' : 'vendors'
   const { data: linked } = await (adminSupabase
-    .from('vendors')
+    .from(tableName)
     .select('profile_id')
     .not('profile_id', 'is', null) as any)
 

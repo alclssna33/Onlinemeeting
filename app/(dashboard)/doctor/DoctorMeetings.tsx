@@ -15,6 +15,7 @@ type Meeting = {
   note: string | null
   vendor_note: string | null
   created_at: string
+  updated_at: string
   stage: { name: string; color: string }
   vendor: { company_name: string; rep_name: string | null }
 }
@@ -82,6 +83,17 @@ function Section({ title, count, color, defaultOpen = true, children }: {
   )
 }
 
+const SIX_HOURS = 6 * 60 * 60 * 1000
+
+function hasNew(list: Meeting[]) {
+  const now = Date.now()
+  return list.some(m => {
+    // updated_at이 created_at보다 이후이면 벤더가 처리한 것
+    const isUpdatedByVendor = m.updated_at !== m.created_at
+    return isUpdatedByVendor && now - new Date(m.updated_at).getTime() < SIX_HOURS
+  })
+}
+
 export default function DoctorMeetings({ meetings }: Props) {
   const pending = meetings.filter(m => m.status === 'pending')
   const confirmed = meetings.filter(m => m.status === 'confirmed')
@@ -116,11 +128,17 @@ export default function DoctorMeetings({ meetings }: Props) {
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: '응답 대기', value: pending.length, color: '#f59e0b' },
-          { label: '확정 완료', value: confirmed.length, color: '#16a34a' },
-          { label: '거절/취소', value: others.length, color: '#9ca3af' },
+          { label: '응답 대기', value: pending.length, color: '#f59e0b', isNew: false },
+          { label: '확정 완료', value: confirmed.length, color: '#16a34a', isNew: hasNew(confirmed) },
+          { label: '거절/취소', value: others.length, color: '#9ca3af', isNew: hasNew(others) },
         ].map(s => (
-          <div key={s.label} className="glass rounded-2xl px-4 py-3 text-center">
+          <div key={s.label} className="glass rounded-2xl px-4 py-3 text-center relative">
+            {s.isNew && (
+              <span className="absolute top-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: '#dc2626', color: '#fff', fontSize: '10px', lineHeight: 1 }}>
+                N
+              </span>
+            )}
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
           </div>

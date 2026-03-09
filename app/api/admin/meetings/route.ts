@@ -23,7 +23,7 @@ export async function GET() {
   const { data, error } = await (adminClient
     .from('meeting_requests')
     .select(`
-      id, status, confirmed_time, meet_link, created_at, note, vendor_note,
+      id, status, meeting_type, confirmed_time, meet_link, created_at, note, vendor_note,
       stage:stages(name, color),
       doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, email, doctors(clinic_name)),
       vendor:vendors(company_name, rep_name, email)

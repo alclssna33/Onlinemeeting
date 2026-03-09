@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import MiniCalendar from '@/app/components/MiniCalendar'
+import { createClient } from '@/lib/supabase/client'
 
 // ── 타입 ──────────────────────────────────────────────────────
 type MeetingStatus = 'pending' | 'confirmed' | 'rejected'
@@ -11,6 +12,7 @@ type MeetingStatus = 'pending' | 'confirmed' | 'rejected'
 type Meeting = {
   id: string
   status: MeetingStatus
+  selection_status: 'selected' | 'eliminated' | null
   proposed_times: string[]
   confirmed_time: string | null
   meet_link: string | null
@@ -18,15 +20,12 @@ type Meeting = {
   vendor_note: string | null
   created_at: string
   stage: { name: string; color: string; icon: string }
-  doctor_profile: { name: string }
+  doctor_profile: { name: string; phone: string | null }
   doctor_info: { clinic_name: string | null } | null
 }
 
-type Stage = { id: number; name: string; color: string }
-
 type Props = {
   meetings: Meeting[]
-  stages: Stage[]
   vendorName: string
 }
 
@@ -191,6 +190,35 @@ function MeetingCard({ meeting, onConfirm, onReject, loading, overrideMeetLink }
         </div>
       )}
 
+      {/* 선정 / 탈락 배너 */}
+      {meeting.selection_status === 'selected' && (
+        <div className="mx-4 mb-4 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(22,163,74,0.1)', border: '1px solid #bbf7d0' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-base">🏆</span>
+            <p className="text-xs font-bold" style={{ color: '#16a34a' }}>최종 선정 완료!</p>
+          </div>
+          <p className="text-xs" style={{ color: '#15803d' }}>
+            원장님께서 귀사를 [{meeting.stage.name}] 단계의 파트너로 선정하셨습니다.
+          </p>
+          {meeting.doctor_profile?.phone && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs font-semibold" style={{ color: '#15803d' }}>📞 원장님 연락처:</span>
+              <span className="text-xs font-bold" style={{ color: '#166534' }}>{meeting.doctor_profile.phone}</span>
+            </div>
+          )}
+        </div>
+      )}
+      {meeting.selection_status === 'eliminated' && (
+        <div className="mx-4 mb-4 px-4 py-3 rounded-xl flex items-center gap-3"
+          style={{ background: 'var(--bg-muted)', border: '1px solid var(--border-default)' }}>
+          <span className="text-lg">📋</span>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            이 미팅에서 다른 업체가 최종 선정되었습니다.
+          </p>
+        </div>
+      )}
+
       {/* 펼쳐지는 후보 시간 & 처리 영역 */}
       <AnimatePresence>
         {expanded && meeting.status === 'pending' && (
@@ -296,13 +324,49 @@ function MeetingCard({ meeting, onConfirm, onReject, loading, overrideMeetLink }
 }
 
 // ── 메인 인박스 컴포넌트 ──────────────────────────────────────
-export default function VendorInbox({ meetings, stages, vendorName }: Props) {
+export default function VendorInbox({ meetings: initialMeetings, vendorName }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings)
 
   const [activeTab, setActiveTab] = useState<'all' | MeetingStatus>('pending')
-  const [selectedStageId, setSelectedStageId] = useState<number | null>(null)
+  const [selectedStageName, setSelectedStageName] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  // Realtime — selection_status 변경 즉시 반영
+  useEffect(() => {
+    const supabase = createClient()
+    const ids = initialMeetings.map(m => m.id)
+    if (ids.length === 0) return
+
+    const channel = supabase
+      .channel('vendor-inbox-selection')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'meeting_requests',
+      }, (payload: any) => {
+        const updated = payload.new
+        if (!updated || !ids.includes(updated.id)) return
+        setMeetings(prev => prev.map(m =>
+          m.id === updated.id
+            ? { ...m, status: updated.status, selection_status: updated.selection_status, meet_link: updated.meet_link, confirmed_time: updated.confirmed_time }
+            : m
+        ))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 내 미팅에 실제로 존재하는 단계만 추출
+  const myStages = useMemo(() => {
+    const seen = new Map<string, { name: string; color: string }>()
+    for (const m of meetings) {
+      if (m.stage?.name && !seen.has(m.stage.name)) {
+        seen.set(m.stage.name, { name: m.stage.name, color: m.stage.color })
+      }
+    }
+    return Array.from(seen.values())
+  }, [meetings])
   const [sortAsc, setSortAsc] = useState(false)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   // 확정 직후 즉시 표시할 meetLink (router.refresh 대기 없이)
@@ -323,10 +387,9 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
     // 탭 필터
     if (activeTab !== 'all') list = list.filter(m => m.status === activeTab)
 
-    // 단계 필터 (stage name으로 매핑)
-    if (selectedStageId !== null) {
-      const stageName = stages.find(s => s.id === selectedStageId)?.name
-      if (stageName) list = list.filter(m => m.stage.name === stageName)
+    // 단계 필터
+    if (selectedStageName !== null) {
+      list = list.filter(m => m.stage.name === selectedStageName)
     }
 
     // 검색 (원장명 + 병원명)
@@ -345,7 +408,7 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
     })
 
     return list
-  }, [meetings, activeTab, selectedStageId, search, sortAsc, stages])
+  }, [meetings, activeTab, selectedStageName, search, sortAsc])
 
   // ── 액션 ──
   async function handleConfirm(requestId: string, confirmedTime: string) {
@@ -416,6 +479,45 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* 선정/탈락 알림 배너 */}
+      {meetings.some(m => m.selection_status === 'selected') && (() => {
+        const sel = meetings.find(m => m.selection_status === 'selected')!
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl px-6 py-5"
+            style={{ background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }}>
+            <div className="flex items-start gap-4">
+              <span className="text-2xl mt-0.5">🎉</span>
+              <div className="flex-1">
+                <p className="font-bold text-white text-sm">최종 선정 업체입니다!</p>
+                <p className="text-white/85 text-xs mt-1">
+                  <strong>{sel.doctor_profile?.name} 원장님</strong>께서 귀사를 [{sel.stage?.name}] 단계의 최종 파트너로 선정하셨습니다.
+                </p>
+                {sel.doctor_profile?.phone && (
+                  <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-xl px-4 py-2">
+                    <span className="text-white text-xs">📞 원장님 연락처</span>
+                    <span className="text-white font-bold text-sm">{sel.doctor_profile.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )
+      })()}
+      {!meetings.some(m => m.selection_status === 'selected') && meetings.some(m => m.selection_status === 'eliminated') && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl px-6 py-4 flex items-center gap-4"
+          style={{ background: 'var(--glass-bg)', border: '1px solid var(--border-default)' }}>
+          <span className="text-2xl">📋</span>
+          <div>
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>미팅 검토 결과 안내</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              일부 미팅에서 다른 업체가 선정되었습니다. 자세한 내용은 아래 목록을 확인해주세요.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* 상단 헤더 — 풀 너비 */}
       <div className="glass rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
         <div>
@@ -491,10 +593,10 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
             }}
           />
 
-          {/* 단계 필터 */}
+          {/* 단계 필터 — 내 미팅에 있는 단계만 표시 */}
           <select
-            value={selectedStageId ?? ''}
-            onChange={e => setSelectedStageId(e.target.value ? Number(e.target.value) : null)}
+            value={selectedStageName ?? ''}
+            onChange={e => setSelectedStageName(e.target.value || null)}
             className="px-4 py-2 rounded-xl border text-sm outline-none"
             style={{
               background: 'var(--bg-muted)',
@@ -503,8 +605,8 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
             }}
           >
             <option value="">전체 단계</option>
-            {stages.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+            {myStages.map(s => (
+              <option key={s.name} value={s.name}>{s.name}</option>
             ))}
           </select>
 
@@ -524,10 +626,10 @@ export default function VendorInbox({ meetings, stages, vendorName }: Props) {
       </div>
 
       {/* 결과 카운트 */}
-      {(search || selectedStageId !== null) && (
+      {(search || selectedStageName !== null) && (
         <p className="text-sm px-1" style={{ color: 'var(--text-muted)' }}>
           검색 결과 {filtered.length}건
-          <button onClick={() => { setSearch(''); setSelectedStageId(null) }}
+          <button onClick={() => { setSearch(''); setSelectedStageName(null) }}
             className="ml-2 underline" style={{ color: 'var(--brand-primary)' }}>
             초기화
           </button>

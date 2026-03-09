@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const { data: meeting, error: fetchError } = await (supabase
       .from('meeting_requests')
-      .select(`id, status, vendor_id, doctor_id, note, stage:stages(name)`)
+      .select(`id, status, meeting_type, vendor_id, doctor_id, note, stage:stages(name)`)
       .eq('id', requestId)
       .eq('vendor_id', vendor.id)
       .single() as any)
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // 원장 프로필 admin client로 조회 (RLS 우회)
     const { data: doctorProfile } = await (createAdminClient()
       .from('profiles')
-      .select('name, email')
+      .select('name, email, notify_email')
       .eq('id', meeting.doctor_id)
       .single() as any)
 
@@ -59,28 +59,42 @@ export async function POST(req: NextRequest) {
     let meetLink: string | null = null
     meetLink = await createMeetSpace()  // 실패 시 null 반환 (non-blocking)
 
-    // ── 2. Google Calendar 일정 생성 (선택, 토글 ON일 때만) ──────
+    // ── 2. Google Calendar 일정 생성 ─────────────────────────────
+    // express: 항상 전용 캘린더에 생성
+    // standard: calendar_enabled 토글 확인 후 생성
     const adminClient = createAdminClient()
-    const { data: calSetting } = await (adminClient
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'calendar_enabled')
-      .single() as any)
-    const calendarEnabled = calSetting?.value !== 'false'
+    const meetingType: string = meeting.meeting_type ?? 'standard'
+
+    let calendarEnabled = false
+    let calendarIdToUse: string | undefined
+
+    if (meetingType === 'express') {
+      calendarEnabled = true
+      calendarIdToUse = process.env.GOOGLE_CALENDAR_ID_EXPRESS
+    } else {
+      const { data: calSetting } = await (adminClient
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'calendar_enabled')
+        .single() as any)
+      calendarEnabled = calSetting?.value !== 'false'
+      calendarIdToUse = process.env.GOOGLE_CALENDAR_ID
+    }
 
     let calendarEventId: string | null = null
-    if (calendarEnabled) try {
+    if (calendarEnabled && calendarIdToUse) try {
       const attendees = [doctorProfile?.email, vendor.email].filter(Boolean)
       const noteText = meeting.note ? `\n원장님 전달사항: ${meeting.note}` : ''
+      const typeLabel = meetingType === 'express' ? '[일사천리] ' : ''
       const { eventId } = await createMeetingEvent({
-        title: `[개비공] ${doctorProfile?.name ?? '원장님'} × ${vendor.company_name}`,
+        title: `[개비공] ${typeLabel}${doctorProfile?.name ?? '원장님'} × ${vendor.company_name}`,
         description: `개원 단계: ${stage?.name}\n참석: ${doctorProfile?.name} 원장님, ${vendor.company_name}${noteText}`,
         startTime: confirmedTime,
         durationMinutes: 60,
         attendeeEmails: attendees,
-      })
+      }, calendarIdToUse)
       calendarEventId = eventId
-      console.log('[confirm] 캘린더 이벤트 생성 완료:', eventId)
+      console.log(`[confirm] 캘린더 이벤트 생성 완료 (${meetingType}):`, eventId)
     } catch (calErr: any) {
       console.error('[confirm] 캘린더 생성 실패 (non-blocking):', calErr.message ?? calErr)
     }
@@ -99,9 +113,10 @@ export async function POST(req: NextRequest) {
     if (updateError) throw updateError
 
     // ── 원장에게 이메일 발송 ──────────────────────────────────
-    if (doctorProfile?.email) {
+    const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
+    if (doctorEmailTo) {
       await notifyDoctorMeetingConfirmed({
-        doctorEmail: doctorProfile.email,
+        doctorEmail: doctorEmailTo,
         doctorName: doctorProfile.name,
         vendorName: vendor.company_name,
         stageName: stage?.name,

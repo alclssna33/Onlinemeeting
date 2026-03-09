@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 async function checkAdmin() {
@@ -8,7 +9,7 @@ async function checkAdmin() {
   const { data: profile } = await (supabase.from('profiles') as any)
     .select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return null
-  return supabase
+  return createAdminClient()
 }
 
 export async function GET() {

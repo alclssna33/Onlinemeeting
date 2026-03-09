@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import DoctorDashboard from './DoctorDashboard'
 
@@ -12,6 +13,14 @@ export default async function DoctorPage() {
     .select('role, name')
     .eq('id', user.id)
     .single() as { data: { role: string; name: string } | null; error: unknown }
+
+  // 원장 권한 조회 (auth_express, auth_bidding) — adminClient로 RLS 우회
+  const adminClient = createAdminClient()
+  const { data: doctorAuth } = await (adminClient
+    .from('doctors')
+    .select('auth_express, auth_bidding')
+    .eq('id', user.id)
+    .single() as any)
 
   if (!profile) redirect('/login')
   if (profile.role !== 'doctor' && profile.role !== 'admin') redirect('/login')
@@ -41,7 +50,7 @@ export default async function DoctorPage() {
   const { data: meetingsRaw } = await (supabase
     .from('meeting_requests')
     .select(`
-      id, status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
+      id, status, vendor_id, stage_id, selection_status, meeting_type, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at, updated_at,
       stage:stages(name, color),
       vendor:vendors(company_name, rep_name)
     `)
@@ -63,6 +72,8 @@ export default async function DoctorPage() {
           doctorId={user.id}
           doctorName={profile.name}
           meetings={meetings as any}
+          authExpress={doctorAuth?.auth_express ?? false}
+          authBidding={doctorAuth?.auth_bidding ?? false}
         />
       </div>
     </main>

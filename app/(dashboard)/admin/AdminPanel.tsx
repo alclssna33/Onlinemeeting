@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MeetingMonitor from './MeetingMonitor'
+import BiddingVendorManager from './BiddingVendorManager'
+import DoctorBiddingAssigner from './DoctorBiddingAssigner'
+import BiddingMeetingMonitor from './BiddingMeetingMonitor'
 
 type Stage = { id: number; name: string; color: string; order_index: number; description: string | null }
 type LinkedProfile = { name: string; email: string } | null
@@ -26,8 +29,20 @@ const VENDOR_JOIN_URL = typeof window !== 'undefined'
   ? `${window.location.origin}/join/vendor`
   : '/join/vendor'
 
+type DoctorItem = {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  clinic_name: string | null
+  specialty: string | null
+  auth_express: boolean
+  auth_bidding: boolean
+  created_at: string
+}
+
 export default function AdminPanel() {
-  const [tab, setTab] = useState<'stages' | 'vendors' | 'meetings'>('stages')
+  const [tab, setTab] = useState<'stages' | 'vendors' | 'doctors' | 'bidding_vendors' | 'bidding_assign' | 'meetings' | 'express_meetings' | 'bidding_meetings'>('stages')
   const [stages, setStages] = useState<Stage[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null)
@@ -47,6 +62,10 @@ export default function AdminPanel() {
   const [linkLoading, setLinkLoading] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [doctors, setDoctors] = useState<DoctorItem[]>([])
+  const [doctorsLoading, setDoctorsLoading] = useState(false)
+  const [togglingDoctor, setTogglingDoctor] = useState<string | null>(null)
+  const [doctorSearch, setDoctorSearch] = useState('')
   const [availableProfiles, setAvailableProfiles] = useState<{ id: string; name: string; email: string; role: string }[]>([])
   const [profilesLoading, setProfilesLoading] = useState(false)
   const [calendarEnabled, setCalendarEnabled] = useState<boolean | null>(null)
@@ -66,10 +85,32 @@ export default function AdminPanel() {
     setVendors(Array.isArray(data) ? data : [])
   }, [])
 
+  const loadDoctors = useCallback(async () => {
+    setDoctorsLoading(true)
+    const res = await fetch('/api/admin/doctors')
+    const data = await res.json()
+    setDoctors(Array.isArray(data) ? data : [])
+    setDoctorsLoading(false)
+  }, [])
+
+  async function toggleDoctorAuth(doctorId: string, field: 'auth_express' | 'auth_bidding', current: boolean) {
+    setTogglingDoctor(doctorId + field)
+    await fetch('/api/admin/doctors', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doctorId, field, value: !current }),
+    })
+    setDoctors(prev => prev.map(d =>
+      d.id === doctorId ? { ...d, [field]: !current } : d
+    ))
+    setTogglingDoctor(null)
+  }
+
   useEffect(() => { loadStages() }, [loadStages])
   useEffect(() => {
     if (tab === 'vendors') loadVendors(selectedStage?.id)
-  }, [tab, selectedStage, loadVendors])
+    if (tab === 'doctors') loadDoctors()
+  }, [tab, selectedStage, loadVendors, loadDoctors])
 
   // 앱 설정 로드
   useEffect(() => {
@@ -132,10 +173,16 @@ export default function AdminPanel() {
     if (!editingVendor?.company_name || !editingVendor?.category_id) return
     setLoading(true)
     const method = editingVendor.id ? 'PATCH' : 'POST'
-    await fetch('/api/admin/vendors', {
+    const res = await fetch('/api/admin/vendors', {
       method, headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editingVendor),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(`저장 실패: ${err.error ?? res.status}`)
+      setLoading(false)
+      return
+    }
     await loadVendors(selectedStage?.id)
     setShowVendorForm(false)
     setEditingVendor(null)
@@ -145,10 +192,15 @@ export default function AdminPanel() {
   // ── 벤더사 삭제 ──
   async function deleteVendor(id: string) {
     if (!confirm('이 업체를 삭제하시겠습니까?')) return
-    await fetch('/api/admin/vendors', {
+    const res = await fetch('/api/admin/vendors', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(`삭제 실패: ${err.error ?? res.status}`)
+      return
+    }
     await loadVendors(selectedStage?.id)
   }
 
@@ -271,23 +323,46 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* 탭 */}
-      <div className="flex gap-2 flex-wrap">
-        {([
-          { key: 'stages', label: '🗂 개원 단계 관리' },
-          { key: 'vendors', label: '🏢 제휴업체 관리' },
-          { key: 'meetings', label: '📅 미팅 현황' },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{
-              background: tab === t.key ? 'var(--brand-primary)' : 'var(--glass-bg)',
-              color: tab === t.key ? '#fff' : 'var(--text-primary)',
-              border: `1px solid ${tab === t.key ? 'var(--brand-primary)' : 'var(--border-default)'}`,
-            }}>
-            {t.label}
-          </button>
-        ))}
+      {/* 탭 — 설정 그룹 / 현황 그룹 */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold px-1" style={{ color: 'var(--text-muted)' }}>설정</p>
+        <div className="flex gap-2 flex-wrap">
+          {([
+            { key: 'stages',          label: '🗂 개원 단계' },
+            { key: 'vendors',         label: '🏢 일반 업체' },
+            { key: 'doctors',         label: '👨‍⚕️ 원장 관리' },
+            { key: 'bidding_vendors', label: '🏆 비딩 업체' },
+            { key: 'bidding_assign',  label: '📐 비딩 배정' },
+          ] as const).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                background: tab === t.key ? 'var(--brand-primary)' : 'var(--glass-bg)',
+                color: tab === t.key ? '#fff' : 'var(--text-primary)',
+                border: `1px solid ${tab === t.key ? 'var(--brand-primary)' : 'var(--border-default)'}`,
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs font-semibold px-1 pt-1" style={{ color: 'var(--text-muted)' }}>미팅 현황</p>
+        <div className="flex gap-2 flex-wrap">
+          {([
+            { key: 'meetings',         label: '📋 일반 미팅',  color: '#6366f1' },
+            { key: 'express_meetings', label: '⚡ 일사천리',    color: '#6366f1' },
+            { key: 'bidding_meetings', label: '🏆 비딩 현황',  color: '#f59e0b' },
+          ] as const).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                background: tab === t.key ? t.color : 'var(--glass-bg)',
+                color: tab === t.key ? '#fff' : 'var(--text-primary)',
+                border: `1px solid ${tab === t.key ? t.color : 'var(--border-default)'}`,
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── 단계 관리 탭 ── */}
@@ -455,8 +530,111 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── 미팅 현황 탭 ── */}
-      {tab === 'meetings' && <MeetingMonitor />}
+      {/* ── 원장 관리 탭 ── */}
+      {tab === 'doctors' && (
+        <div className="glass rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>
+              원장 목록 ({doctors.length})
+            </h2>
+            <button onClick={loadDoctors}
+              className="text-xs px-3 py-1.5 rounded-lg border transition-all hover:opacity-80"
+              style={{ borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
+              새로고침
+            </button>
+          </div>
+
+          <input
+            type="text"
+            placeholder="이름, 이메일, 병원명으로 검색..."
+            value={doctorSearch}
+            onChange={e => setDoctorSearch(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
+            style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+          />
+
+          {doctorsLoading ? (
+            <p className="text-sm py-6 text-center" style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
+          ) : doctors.length === 0 ? (
+            <p className="text-sm py-6 text-center" style={{ color: 'var(--text-muted)' }}>가입한 원장이 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {doctors.filter(d => {
+                const q = doctorSearch.trim().toLowerCase()
+                if (!q) return true
+                return (
+                  d.name.toLowerCase().includes(q) ||
+                  d.email.toLowerCase().includes(q) ||
+                  (d.clinic_name ?? '').toLowerCase().includes(q)
+                )
+              }).map(doctor => (
+                <div key={doctor.id} className="rounded-xl border p-4 flex items-center gap-4 flex-wrap"
+                  style={{ borderColor: 'var(--border-default)', background: 'var(--bg-muted)' }}>
+                  {/* 원장 정보 */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {doctor.name}
+                      {doctor.clinic_name && (
+                        <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                          {doctor.clinic_name}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {doctor.email}{doctor.specialty ? ` · ${doctor.specialty}` : ''}
+                    </p>
+                  </div>
+
+                  {/* 일사천리 토글 */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-semibold" style={{ color: doctor.auth_express ? '#6366f1' : 'var(--text-muted)' }}>
+                      ⚡ 일사천리
+                    </span>
+                    <button
+                      onClick={() => toggleDoctorAuth(doctor.id, 'auth_express', doctor.auth_express)}
+                      disabled={togglingDoctor === doctor.id + 'auth_express'}
+                      className="relative w-10 h-5 rounded-full transition-all duration-300 disabled:opacity-50"
+                      style={{ background: doctor.auth_express ? '#6366f1' : '#d1d5db' }}>
+                      <span
+                        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300"
+                        style={{ transform: doctor.auth_express ? 'translateX(20px)' : 'translateX(0)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* 비딩 토글 */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-semibold" style={{ color: doctor.auth_bidding ? '#f59e0b' : 'var(--text-muted)' }}>
+                      🏆 비딩
+                    </span>
+                    <button
+                      onClick={() => toggleDoctorAuth(doctor.id, 'auth_bidding', doctor.auth_bidding)}
+                      disabled={togglingDoctor === doctor.id + 'auth_bidding'}
+                      className="relative w-10 h-5 rounded-full transition-all duration-300 disabled:opacity-50"
+                      style={{ background: doctor.auth_bidding ? '#f59e0b' : '#d1d5db' }}>
+                      <span
+                        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300"
+                        style={{ transform: doctor.auth_bidding ? 'translateX(20px)' : 'translateX(0)' }}
+                      />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 비딩 업체 관리 탭 ── */}
+      {tab === 'bidding_vendors' && <BiddingVendorManager />}
+
+      {/* ── 비딩 배정 탭 ── */}
+      {tab === 'bidding_assign' && <DoctorBiddingAssigner />}
+
+      {/* ── 미팅 현황 탭들 ── */}
+      {tab === 'meetings' && <MeetingMonitor meetingType="standard" />}
+      {tab === 'express_meetings' && <MeetingMonitor meetingType="express" />}
+      {tab === 'bidding_meetings' && <BiddingMeetingMonitor />}
 
       {/* ── 계정 연결 모달 ── */}
       <AnimatePresence>

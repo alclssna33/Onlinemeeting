@@ -16,15 +16,23 @@ export default async function VendorPage() {
 
   if (profile?.role !== 'vendor' && profile?.role !== 'admin') redirect('/login')
 
-  // 벤더사 record 조회 (profile_id로 연결)
+  // 일반 벤더사 record 조회
   const { data: vendor } = await supabase
     .from('vendors')
     .select('id, company_name')
     .eq('profile_id', user.id)
     .single() as { data: { id: string; company_name: string } | null; error: unknown }
 
-  // 벤더사 계정이 연결되지 않은 경우
-  if (!vendor) {
+  // 비딩 벤더 record 조회 (일반 벤더와 별개)
+  const adminClient = createAdminClient()
+  const { data: biddingVendor } = await (adminClient
+    .from('bidding_vendors')
+    .select('id, company_name, is_active')
+    .eq('profile_id', user.id)
+    .single() as any)
+
+  // 둘 다 없으면 계정 연결 필요
+  if (!vendor && !biddingVendor) {
     return (
       <main className="gradient-bg min-h-screen p-6">
         <div className="max-w-2xl mx-auto">
@@ -43,29 +51,26 @@ export default async function VendorPage() {
     )
   }
 
-  // 미팅 요청 전체 조회 — admin client로 RLS 우회 (doctor 닉네임 정확히 표시)
-  const adminClient = createAdminClient()
+  // 비딩 벤더만 있고 일반 벤더 없는 경우 → 비딩 보드로 리디렉트
+  if (!vendor && biddingVendor) {
+    redirect('/vendor/bidding')
+  }
+
+  // 일반 벤더 미팅 목록 조회
   const { data: meetings, error: meetingsError } = await (adminClient
     .from('meeting_requests')
     .select(`
-      id, status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
+      id, status, selection_status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
       stage:stages(name, color, icon),
-      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, doctors(clinic_name))
+      doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, phone, doctors(clinic_name))
     `)
-    .eq('vendor_id', vendor.id)
+    .eq('vendor_id', vendor!.id)
     .order('created_at', { ascending: false }) as any)
 
   if (meetingsError) {
     console.error('[vendor/page] meetings query error:', meetingsError)
   }
 
-  // 필터 드롭다운용 단계 목록
-  const { data: stages } = await (supabase
-    .from('stages')
-    .select('id, name, color')
-    .order('order_index') as any)
-
-  // 타입 정규화
   const normalizedMeetings = ((meetings as any[]) ?? []).map((m: any) => {
     const stage = Array.isArray(m.stage) ? m.stage[0] : m.stage
     const rawProfile = Array.isArray(m.doctor_profile) ? m.doctor_profile[0] : m.doctor_profile
@@ -76,18 +81,35 @@ export default async function VendorPage() {
     return {
       ...m,
       stage,
-      doctor_profile: rawProfile ? { name: rawProfile.name ?? '알 수 없음' } : { name: '알 수 없음' },
+      doctor_profile: rawProfile ? { name: rawProfile.name ?? '알 수 없음', phone: rawProfile.phone ?? null } : { name: '알 수 없음', phone: null },
       doctor_info: doctorInfo,
     }
   })
 
   return (
     <main className="gradient-bg min-h-screen p-4 sm:p-6">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-4">
+        {/* 비딩 벤더이기도 하면 비딩 보드 링크 표시 */}
+        {biddingVendor && (
+          <div className="glass rounded-2xl px-5 py-3 flex items-center justify-between"
+            style={{ borderLeft: '4px solid #f59e0b' }}>
+            <div>
+              <p className="text-sm font-bold" style={{ color: '#f59e0b' }}>🏆 비딩 보드 이용 가능</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                배정된 원장님의 비딩 슬롯을 선점하세요.
+              </p>
+            </div>
+            <a href="/vendor/bidding"
+              className="text-sm px-4 py-2 rounded-xl font-bold shrink-0"
+              style={{ background: '#f59e0b', color: '#fff' }}>
+              비딩 보드 →
+            </a>
+          </div>
+        )}
+
         <VendorInbox
           meetings={normalizedMeetings}
-          stages={stages ?? []}
-          vendorName={vendor.company_name}
+          vendorName={vendor!.company_name}
         />
       </div>
     </main>

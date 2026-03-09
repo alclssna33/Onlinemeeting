@@ -34,13 +34,14 @@ export interface MeetingEventResult {
 }
 
 export async function createMeetingEvent(
-  params: CreateMeetingEventParams
+  params: CreateMeetingEventParams,
+  calendarIdOverride?: string
 ): Promise<MeetingEventResult> {
   const { title, description, startTime, durationMinutes = 60, attendeeEmails = [] } = params
 
   const auth = getAuth()
   const calendar = google.calendar({ version: 'v3', auth })
-  const calendarId = process.env.GOOGLE_CALENDAR_ID!
+  const calendarId = calendarIdOverride ?? process.env.GOOGLE_CALENDAR_ID!
 
   const start = new Date(startTime)
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000)

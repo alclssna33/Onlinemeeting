@@ -4,7 +4,7 @@
 
 const GAS_URL = process.env.GAS_WEBAPP_URL!
 
-type EmailType = 'meeting_request' | 'meeting_confirmed' | 'meeting_rejected'
+type EmailType = 'meeting_request' | 'meeting_confirmed' | 'meeting_rejected' | 'vendor_selected' | 'vendor_eliminated' | 'bidding_slot_claimed' | 'bidding_slot_cancelled' | 'bidding_event_created'
 
 interface MeetingRequestPayload {
   vendorEmail: string
@@ -30,10 +30,58 @@ interface MeetingRejectedPayload {
   stageName: string
 }
 
+interface VendorSelectionPayload {
+  vendorEmail: string
+  vendorName: string
+  doctorName: string
+  doctorPhone?: string | null
+  stageName: string
+  meetLink?: string | null
+}
+
+interface VendorEliminatedPayload {
+  vendorEmail: string
+  vendorName: string
+  doctorName: string
+  stageName: string
+}
+
+interface BiddingSlotClaimedPayload {
+  doctorEmail: string
+  doctorName: string
+  vendorName: string
+  biddingRound: number
+  slotTime: string       // ISO 8601
+  meetLink?: string | null
+}
+
+interface BiddingSlotCancelledPayload {
+  doctorEmail: string
+  doctorName: string
+  vendorName: string
+  biddingRound: number
+  slotTime: string
+}
+
+interface BiddingEventCreatedPayload {
+  vendorEmail: string
+  vendorName: string
+  doctorName: string
+  biddingRound: number
+  title: string | null
+  slotsCount: number
+  platformUrl: string
+}
+
 type EmailPayload =
   | { type: 'meeting_request'; data: MeetingRequestPayload }
   | { type: 'meeting_confirmed'; data: MeetingConfirmedPayload }
   | { type: 'meeting_rejected'; data: MeetingRejectedPayload }
+  | { type: 'vendor_selected'; data: VendorSelectionPayload }
+  | { type: 'vendor_eliminated'; data: VendorEliminatedPayload }
+  | { type: 'bidding_slot_claimed'; data: BiddingSlotClaimedPayload }
+  | { type: 'bidding_slot_cancelled'; data: BiddingSlotCancelledPayload }
+  | { type: 'bidding_event_created'; data: BiddingEventCreatedPayload }
 
 async function sendEmail(payload: EmailPayload): Promise<void> {
   if (!GAS_URL) {
@@ -74,4 +122,29 @@ export function notifyDoctorMeetingConfirmed(data: MeetingConfirmedPayload) {
 /** 벤더사 거절 시 원장에게 알림 */
 export function notifyDoctorMeetingRejected(data: MeetingRejectedPayload) {
   return sendEmail({ type: 'meeting_rejected', data })
+}
+
+/** 원장이 벤더사를 선정했을 때 해당 벤더사에게 알림 */
+export function notifyVendorSelected(data: VendorSelectionPayload) {
+  return sendEmail({ type: 'vendor_selected', data })
+}
+
+/** 원장이 다른 벤더사를 선정하여 탈락됐을 때 해당 벤더사에게 알림 */
+export function notifyVendorEliminated(data: VendorEliminatedPayload) {
+  return sendEmail({ type: 'vendor_eliminated', data })
+}
+
+/** 비딩 슬롯 선점 시 원장에게 알림 */
+export function notifyDoctorBiddingSlotClaimed(data: BiddingSlotClaimedPayload) {
+  return sendEmail({ type: 'bidding_slot_claimed', data })
+}
+
+/** 비딩 슬롯 취소 시 원장에게 알림 */
+export function notifyDoctorBiddingSlotCancelled(data: BiddingSlotCancelledPayload) {
+  return sendEmail({ type: 'bidding_slot_cancelled', data })
+}
+
+/** 비딩 이벤트 등록 시 배정된 벤더사에게 알림 */
+export function notifyVendorBiddingEventCreated(data: BiddingEventCreatedPayload) {
+  return sendEmail({ type: 'bidding_event_created', data })
 }

@@ -87,10 +87,18 @@ export async function DELETE(req: NextRequest) {
       .from('vendors').select('profile_id').eq('id', vendorId).single() as any)
 
     if (vendor?.profile_id) {
-      await (adminSupabase as any)
-        .from('profiles')
-        .update({ role: 'doctor' })
-        .eq('id', vendor.profile_id)
+      // 비딩 벤더로도 연결되어 있으면 role 유지 (접근 권한 보호)
+      const { data: biddingLink } = await (adminSupabase
+        .from('bidding_vendors')
+        .select('id')
+        .eq('profile_id', vendor.profile_id)
+        .limit(1) as any)
+      if (!biddingLink?.length) {
+        await (adminSupabase as any)
+          .from('profiles')
+          .update({ role: 'doctor' })
+          .eq('id', vendor.profile_id)
+      }
     }
 
     await (adminSupabase as any)

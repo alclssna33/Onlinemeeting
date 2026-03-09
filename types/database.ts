@@ -7,6 +7,11 @@
 export type UserRole = 'admin' | 'doctor' | 'vendor'
 export type MeetingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled'
 export type StageStatus = 'not_started' | 'in_progress' | 'completed'
+export type MeetingType = 'standard' | 'express'
+export type SelectionStatus = 'selected' | 'eliminated'
+export type BiddingRound = 1 | 2 | 3
+export type BiddingEventStatus = 'open' | 'closed' | 'completed'
+export type BiddingSlotStatus = 'available' | 'claimed' | 'cancelled'
 
 export type Database = {
   public: {
@@ -24,21 +29,6 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
-      }
-
-      // ── 원장(Doctor) 추가 정보 ──
-      doctors: {
-        Row: {
-          id: string             // profiles.id
-          clinic_name: string | null
-          clinic_address: string | null
-          specialty: string | null   // 진료과목
-          open_target_date: string | null  // 목표 개원일
-          note: string | null
-          created_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['doctors']['Row'], 'created_at'>
-        Update: Partial<Database['public']['Tables']['doctors']['Insert']>
       }
 
       // ── 벤더사(Vendor) 추가 정보 ──
@@ -108,16 +98,99 @@ export type Database = {
           vendor_id: string
           stage_id: number
           status: MeetingStatus
+          meeting_type: MeetingType  // 'standard' | 'express'
           proposed_times: string[]   // ISO 8601 날짜/시간 배열 (최대 5개)
           confirmed_time: string | null
           meet_link: string | null   // Google Meet URL
           calendar_event_id: string | null
           note: string | null
+          vendor_note: string | null
+          selection_status: SelectionStatus | null
           created_at: string
           updated_at: string
         }
         Insert: Omit<Database['public']['Tables']['meeting_requests']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['meeting_requests']['Insert']>
+      }
+
+      // ── 원장 정보 (doctors) — auth_express/bidding 포함 ──
+      doctors: {
+        Row: {
+          id: string             // profiles.id
+          clinic_name: string | null
+          clinic_address: string | null
+          specialty: string | null
+          open_target_date: string | null
+          note: string | null
+          auth_express: boolean
+          auth_bidding: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['doctors']['Row'], 'created_at'>
+        Update: Partial<Database['public']['Tables']['doctors']['Insert']>
+      }
+
+      // ── 비딩 전용 벤더 (vendors와 완전 분리) ──
+      bidding_vendors: {
+        Row: {
+          id: string
+          company_name: string
+          rep_name: string | null
+          email: string | null
+          phone: string | null
+          description: string | null
+          website: string | null
+          is_active: boolean
+          profile_id: string | null  // profiles.id (로그인 계정 연결)
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['bidding_vendors']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['bidding_vendors']['Insert']>
+      }
+
+      // ── 원장 ↔ 비딩벤더 회차별 매핑 ──
+      doctor_bidding_vendors: {
+        Row: {
+          id: string
+          doctor_id: string
+          bidding_vendor_id: string
+          bidding_round: BiddingRound
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['doctor_bidding_vendors']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['doctor_bidding_vendors']['Insert']>
+      }
+
+      // ── 비딩 이벤트 (원장이 회차별 공지) ──
+      bidding_events: {
+        Row: {
+          id: string
+          doctor_id: string
+          bidding_round: BiddingRound
+          title: string | null
+          note: string | null
+          status: BiddingEventStatus
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['bidding_events']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['bidding_events']['Insert']>
+      }
+
+      // ── 비딩 슬롯 (5~10개 시간 조각) ──
+      bidding_slots: {
+        Row: {
+          id: string
+          bidding_event_id: string
+          proposed_time: string
+          claimed_by: string | null      // bidding_vendors.id
+          claimed_at: string | null
+          meet_link: string | null
+          calendar_event_id: string | null
+          status: BiddingSlotStatus
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['bidding_slots']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['bidding_slots']['Insert']>
       }
     }
 
@@ -139,10 +212,24 @@ export type Stage = Database['public']['Tables']['stages']['Row']
 export type ProcessItem = Database['public']['Tables']['process_items']['Row']
 export type DoctorProgress = Database['public']['Tables']['doctor_progress']['Row']
 export type MeetingRequest = Database['public']['Tables']['meeting_requests']['Row']
+export type BiddingVendor = Database['public']['Tables']['bidding_vendors']['Row']
+export type DoctorBiddingVendor = Database['public']['Tables']['doctor_bidding_vendors']['Row']
+export type BiddingEvent = Database['public']['Tables']['bidding_events']['Row']
+export type BiddingSlot = Database['public']['Tables']['bidding_slots']['Row']
 
 // ── JOIN 결과 타입 ──
 export type MeetingRequestWithDetails = MeetingRequest & {
   doctor: Profile & { doctors: Doctor }
   vendor: Profile & { vendors: Vendor }
   stage: Stage
+}
+
+export type BiddingSlotForVendor = Omit<BiddingSlot, 'claimed_by' | 'calendar_event_id'> & {
+  is_mine: boolean   // 내가 선점한 슬롯 여부
+  is_taken: boolean  // 다른 업체가 선점 여부 (블라인드)
+}
+
+export type BiddingEventWithSlots = BiddingEvent & {
+  slots: BiddingSlot[]
+  doctor: Profile
 }

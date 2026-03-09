@@ -8,8 +8,9 @@ import { motion } from 'framer-motion'
 export default function SetupPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [notifyEmail, setNotifyEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({})
+  const [errors, setErrors] = useState<{ name?: string; phone?: string; notifyEmail?: string }>({})
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -25,6 +26,11 @@ export default function SetupPage() {
     if (!trimmedPhone) newErrors.phone = '전화번호를 입력해주세요.'
     else if (!/^[0-9\-+\s]{7,20}$/.test(trimmedPhone)) newErrors.phone = '올바른 전화번호를 입력해주세요.'
 
+    const trimmedNotifyEmail = notifyEmail.trim()
+    if (trimmedNotifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedNotifyEmail)) {
+      newErrors.notifyEmail = '올바른 이메일 형식을 입력해주세요.'
+    }
+
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
 
     setLoading(true)
@@ -36,7 +42,11 @@ export default function SetupPage() {
 
     const { error: updateError } = await (supabase as any)
       .from('profiles')
-      .update({ name: trimmedName, phone: trimmedPhone })
+      .update({
+        name: trimmedName,
+        phone: trimmedPhone,
+        notify_email: trimmedNotifyEmail || null,
+      })
       .eq('id', user.id)
 
     if (updateError) {
@@ -120,6 +130,33 @@ export default function SetupPage() {
             {errors.phone && (
               <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.phone}</p>
             )}
+          </div>
+
+          {/* 알림 이메일 (선택) */}
+          <div>
+            <label className="text-sm font-semibold block mb-1.5"
+              style={{ color: 'var(--text-secondary)' }}>
+              알림 수신 이메일 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(선택)</span>
+            </label>
+            <input
+              type="email"
+              value={notifyEmail}
+              onChange={e => { setNotifyEmail(e.target.value); setErrors(p => ({ ...p, notifyEmail: undefined })) }}
+              placeholder="예: doctor@hospital.com"
+              className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
+              style={{
+                background: 'var(--bg-muted)',
+                borderColor: errors.notifyEmail ? '#dc2626' : 'var(--border-default)',
+                color: 'var(--text-primary)',
+              }}
+            />
+            {errors.notifyEmail
+              ? <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.notifyEmail}</p>
+              : <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  입력하지 않으면 가입한 Gmail로 발송됩니다.<br />
+                  Gmail을 잘 확인하지 않으신다면 자주 쓰는 이메일을 입력해 주세요.
+                </p>
+            }
           </div>
 
           <button

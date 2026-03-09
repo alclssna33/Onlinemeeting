@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notifyDoctorMeetingRejected } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
@@ -26,11 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { data: meeting, error: fetchError } = await (supabase
       .from('meeting_requests')
-      .select(`
-        id, status, vendor_id,
-        stage:stages(name),
-        doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, email)
-      `)
+      .select('id, status, vendor_id, doctor_id, stage:stages(name)')
       .eq('id', requestId)
       .eq('vendor_id', vendor.id)
       .single() as any)
@@ -50,14 +47,21 @@ export async function POST(req: NextRequest) {
     if (updateError) throw updateError
 
     const stage = meeting.stage as any
-    const doctorProfile = meeting.doctor_profile as any
 
-    if (doctorProfile?.email) {
+    // RLS로 인해 벤더사 세션에서 원장 프로필 조회 불가 → adminClient 사용
+    const { data: doctorProfile } = await (createAdminClient()
+      .from('profiles')
+      .select('name, email, notify_email')
+      .eq('id', meeting.doctor_id)
+      .single() as any)
+
+    const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
+    if (doctorEmailTo) {
       await notifyDoctorMeetingRejected({
-        doctorEmail: doctorProfile.email,
+        doctorEmail: doctorEmailTo,
         doctorName: doctorProfile.name,
         vendorName: vendor.company_name,
-        stageName: stage.name,
+        stageName: stage?.name,
       }).catch(err => console.error('[reject] 이메일 발송 실패 (non-blocking):', err))
     }
 

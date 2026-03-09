@@ -10,11 +10,12 @@ export type CalendarMeeting = {
 
 type Props = {
   meetings: CalendarMeeting[]
+  listTitle?: string
 }
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토']
 
-export default function MiniCalendar({ meetings }: Props) {
+export default function MiniCalendar({ meetings, listTitle = '이번 달 확정 미팅' }: Props) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -128,9 +129,10 @@ export default function MiniCalendar({ meetings }: Props) {
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 hidden group-hover:block pointer-events-none">
                       <div className="rounded-xl px-3 py-2 text-xs shadow-xl whitespace-nowrap"
                         style={{
-                          background: 'var(--bg-card)',
+                          background: 'var(--bg-muted)',
                           border: '1px solid var(--border-default)',
                           color: 'var(--text-primary)',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
                         }}>
                         {dayMeetings.map((m, i) => (
                           <div key={i} className="flex items-center gap-1.5 py-0.5">
@@ -153,7 +155,7 @@ export default function MiniCalendar({ meetings }: Props) {
       {thisMonthCount > 0 ? (
         <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: '1px solid var(--border-default)' }}>
           <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-            {month + 1}월 확정 미팅
+            {month + 1}월 {listTitle}
           </p>
           {Object.entries(markedMap)
             .sort(([a], [b]) => Number(a) - Number(b))
@@ -171,7 +173,7 @@ export default function MiniCalendar({ meetings }: Props) {
         </div>
       ) : (
         <div className="mt-3 pt-3 text-center" style={{ borderTop: '1px solid var(--border-default)' }}>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>이번 달 확정 미팅 없음</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>이번 달 {listTitle} 없음</p>
         </div>
       )}
     </div>
