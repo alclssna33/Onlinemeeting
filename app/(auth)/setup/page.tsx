@@ -18,7 +18,7 @@ export default function SetupPage() {
     const trimmedName = name.trim()
     const trimmedPhone = phone.trim()
 
-    const newErrors: { name?: string; phone?: string } = {}
+    const newErrors: { name?: string; phone?: string; notifyEmail?: string } = {}
     if (!trimmedName) newErrors.name = '닉네임을 입력해주세요.'
     else if (trimmedName.length < 2) newErrors.name = '2자 이상 입력해주세요.'
     else if (trimmedName.length > 20) newErrors.name = '20자 이하로 입력해주세요.'
