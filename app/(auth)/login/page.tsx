@@ -155,30 +155,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* 구분선 */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full" style={{ borderTop: '1px solid #e5e7eb' }} />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-3 text-xs" style={{ background: '#f8faf8', color: '#9ca3af' }}>
-                제휴업체 전용
-              </span>
-            </div>
-          </div>
-
-          {/* 벤더사 가입 링크 */}
-          <a
-            href="/join/vendor"
-            className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-2xl text-sm font-medium transition-all hover:opacity-80"
-            style={{
-              border: '1.5px solid #0e3d20',
-              color: '#0e3d20',
-              background: 'transparent',
-            }}
-          >
-            🤝 제휴업체 가입 신청
-          </a>
         </div>
       </div>
     </main>
