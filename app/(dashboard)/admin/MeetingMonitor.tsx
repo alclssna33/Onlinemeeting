@@ -203,7 +203,7 @@ export default function MeetingMonitor({ meetingType }: Props) {
                           {STATUS_LABEL[m.status]}
                         </span>
                         {m.meeting_type === 'express' && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full w-fit"
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full w-fit whitespace-nowrap"
                             style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
                             ⚡ 일사천리
                           </span>
@@ -219,7 +219,7 @@ export default function MeetingMonitor({ meetingType }: Props) {
 
                     {/* 단계 */}
                     <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
                         style={{ background: (m.stage?.color ?? '#888') + '22', color: m.stage?.color ?? '#888' }}>
                         {m.stage?.name ?? '-'}
                       </span>
