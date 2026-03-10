@@ -12,6 +12,7 @@ interface MeetingRequestPayload {
   doctorName: string
   stageName: string
   proposedTimes: string[]
+  platformUrl: string
 }
 
 interface MeetingConfirmedPayload {
@@ -21,6 +22,7 @@ interface MeetingConfirmedPayload {
   stageName: string
   confirmedTime: string
   meetLink?: string | null
+  platformUrl: string
 }
 
 interface MeetingRejectedPayload {
@@ -28,6 +30,7 @@ interface MeetingRejectedPayload {
   doctorName: string
   vendorName: string
   stageName: string
+  platformUrl: string
 }
 
 interface VendorSelectionPayload {
@@ -37,6 +40,7 @@ interface VendorSelectionPayload {
   doctorPhone?: string | null
   stageName: string
   meetLink?: string | null
+  platformUrl: string
 }
 
 interface VendorEliminatedPayload {
@@ -44,6 +48,7 @@ interface VendorEliminatedPayload {
   vendorName: string
   doctorName: string
   stageName: string
+  platformUrl: string
 }
 
 interface BiddingSlotClaimedPayload {
@@ -53,6 +58,7 @@ interface BiddingSlotClaimedPayload {
   biddingRound: number
   slotTime: string       // ISO 8601
   meetLink?: string | null
+  platformUrl: string
 }
 
 interface BiddingSlotCancelledPayload {
@@ -61,6 +67,7 @@ interface BiddingSlotCancelledPayload {
   vendorName: string
   biddingRound: number
   slotTime: string
+  platformUrl: string
 }
 
 interface BiddingEventCreatedPayload {

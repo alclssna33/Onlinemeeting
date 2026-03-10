@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 원장에게 선점 알림 이메일 (비동기, 실패해도 무시)
+  const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
   const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
   if (doctorEmailTo) {
     notifyDoctorBiddingSlotClaimed({
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
       biddingRound: event.bidding_round,
       slotTime: slot.proposed_time,
       meetLink,
+      platformUrl: `${platformUrl}/doctor/bidding`,
     }).catch(e => console.error('[claim] email error:', e))
   }
 

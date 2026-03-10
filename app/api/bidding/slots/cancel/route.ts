@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // 원장에게 취소 알림 이메일 (비동기, 실패해도 무시)
+  const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
   const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
   if (doctorEmailTo && event) {
     notifyDoctorBiddingSlotCancelled({
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       vendorName: bv.company_name,
       biddingRound: event.bidding_round,
       slotTime: slot.proposed_time,
+      platformUrl: `${platformUrl}/doctor/bidding`,
     }).catch(e => console.error('[cancel] email error:', e))
   }
 

@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       .eq('id', meeting.doctor_id)
       .single() as any)
 
+    const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
     const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
     if (doctorEmailTo) {
       await notifyDoctorMeetingRejected({
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
         doctorName: doctorProfile.name,
         vendorName: vendor.company_name,
         stageName: stage?.name,
+        platformUrl: `${platformUrl}/doctor`,
       }).catch(err => console.error('[reject] 이메일 발송 실패 (non-blocking):', err))
     }
 

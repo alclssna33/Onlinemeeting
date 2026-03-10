@@ -99,6 +99,8 @@ export async function POST(req: NextRequest) {
     const doctorPhone = doctorRes.data?.phone ?? null
     const selectedVendor = selectedVendorRes.data
 
+    const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
+
     // 선정 업체 이메일
     if (selectedVendor?.email) {
       notifyVendorSelected({
@@ -108,6 +110,7 @@ export async function POST(req: NextRequest) {
         doctorPhone,
         stageName,
         meetLink: selected.meet_link,
+        platformUrl: `${platformUrl}/vendor`,
       }).catch(err => console.error('[select] 선정 이메일 실패:', err))
     }
 
@@ -125,6 +128,7 @@ export async function POST(req: NextRequest) {
             vendorName: v.company_name,
             doctorName,
             stageName,
+            platformUrl: `${platformUrl}/vendor`,
           }).catch(err => console.error('[select] 탈락 이메일 실패:', err))
         }
       }

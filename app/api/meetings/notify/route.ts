@@ -48,12 +48,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'no vendor email' })
     }
 
+    const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
+
     await notifyVendorMeetingRequest({
       vendorEmail: vendor.email,
       vendorName: vendor.company_name,
       doctorName,
       stageName: stage.name,
       proposedTimes: meeting.proposed_times,
+      platformUrl: `${platformUrl}/vendor`,
     })
 
     return NextResponse.json({ ok: true })

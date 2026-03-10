@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
     if (updateError) throw updateError
 
     // ── 원장에게 이메일 발송 ──────────────────────────────────
+    const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://onlinemeeting-zeta.vercel.app'
     const doctorEmailTo = doctorProfile?.notify_email || doctorProfile?.email
     if (doctorEmailTo) {
       await notifyDoctorMeetingConfirmed({
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
         stageName: stage?.name,
         confirmedTime,
         meetLink,
+        platformUrl: `${platformUrl}/doctor`,
       }).catch(err => console.error('[confirm] 이메일 발송 실패 (non-blocking):', err))
     }
 
