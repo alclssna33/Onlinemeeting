@@ -14,6 +14,7 @@ async function checkAdmin() {
 
 export async function GET(req: Request) {
   const supabase = await createClient()
+  const adminClient = createAdminClient()
   const { searchParams } = new URL(req.url)
   const categoryId = searchParams.get('category_id')
 
@@ -23,14 +24,14 @@ export async function GET(req: Request) {
   const { data: vendors, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // profile_id가 있는 항목에 대해 profiles 정보를 별도로 조회해 합산
+  // profile_id가 있는 항목에 대해 profiles 정보를 별도로 조회해 합산 (RLS 우회 위해 adminClient 사용)
   const profileIds = (vendors ?? [])
     .map((v: any) => v.profile_id)
     .filter(Boolean)
 
   let profileMap: Record<string, { name: string; email: string }> = {}
   if (profileIds.length > 0) {
-    const { data: profiles } = await (supabase
+    const { data: profiles } = await (adminClient
       .from('profiles')
       .select('id, name, email')
       .in('id', profileIds) as any)
