@@ -466,16 +466,49 @@ export default function AdminPanel() {
                 </button>
               </div>
 
+              {/* 연결 현황 요약 */}
+              {vendors.length > 0 && (
+                <div className="flex gap-3 text-xs">
+                  <span className="px-2.5 py-1 rounded-full font-semibold"
+                    style={{ background: 'rgba(22,163,74,0.12)', color: '#16a34a' }}>
+                    ✅ 연결됨 {vendors.filter(v => v.linked_profile).length}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full font-semibold"
+                    style={{ background: 'rgba(245,158,11,0.12)', color: '#d97706' }}>
+                    🔗 미연결 {vendors.filter(v => !v.linked_profile).length}
+                  </span>
+                </div>
+              )}
+
               <div className="space-y-2">
                 {vendors.map(vendor => (
                   <div key={vendor.id} className="rounded-xl border overflow-hidden"
-                    style={{ borderColor: 'var(--border-default)', background: 'var(--bg-muted)' }}>
-                    <div className="flex items-center gap-3 p-3">
+                    style={{
+                      borderColor: vendor.linked_profile ? '#16a34a' : '#f59e0b',
+                      borderLeftWidth: '3px',
+                      background: vendor.linked_profile
+                        ? 'rgba(22,163,74,0.04)'
+                        : 'rgba(245,158,11,0.04)',
+                    }}>
+                    <div className="flex items-center gap-3 p-3 flex-wrap">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          {vendor.company_name}
-                        </p>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {vendor.company_name}
+                          </p>
+                          {vendor.linked_profile ? (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap"
+                              style={{ background: 'rgba(22,163,74,0.15)', color: '#16a34a' }}>
+                              연결됨
+                            </span>
+                          ) : (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap"
+                              style={{ background: 'rgba(245,158,11,0.15)', color: '#d97706' }}>
+                              미연결
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
                           {vendor.rep_name && `${vendor.rep_name} · `}{vendor.email ?? '이메일 없음'}
                         </p>
                       </div>
@@ -484,8 +517,8 @@ export default function AdminPanel() {
                       {vendor.linked_profile ? (
                         <div className="flex items-center gap-2 shrink-0">
                           <div className="text-right">
-                            <p className="text-xs font-medium" style={{ color: '#16a34a' }}>
-                              🟢 {vendor.linked_profile.name}
+                            <p className="text-xs font-semibold" style={{ color: '#16a34a' }}>
+                              {vendor.linked_profile.name}
                             </p>
                             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                               {vendor.linked_profile.email}
@@ -501,7 +534,7 @@ export default function AdminPanel() {
                         <button
                           onClick={() => { setLinkingVendor(vendor); setLinkEmail(''); setLinkError(null); loadAvailableProfiles() }}
                           className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-80"
-                          style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)' }}>
+                          style={{ background: 'rgba(245,158,11,0.12)', color: '#d97706', border: '1px solid rgba(245,158,11,0.4)' }}>
                           🔗 계정 연결
                         </button>
                       )}
