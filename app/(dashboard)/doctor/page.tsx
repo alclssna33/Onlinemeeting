@@ -34,7 +34,7 @@ export default async function DoctorPage() {
   // 전체 벤더사
   const { data: vendorsRaw } = await (supabase
     .from('vendors') as any)
-    .select('id, company_name, rep_name, description, website, category_id, email, phone')
+    .select('id, company_name, rep_name, description, website, category_id, email, phone, profile_id')
     .eq('is_active', true)
 
   const vendors: any[] = vendorsRaw ?? []

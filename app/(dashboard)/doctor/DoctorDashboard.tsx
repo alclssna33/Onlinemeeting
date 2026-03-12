@@ -24,6 +24,7 @@ type Vendor = {
   category_id: number
   email: string | null
   phone: string | null
+  profile_id: string | null
 }
 
 type Meeting = {
@@ -344,13 +345,20 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {vendors.map((vendor, i) => (
+                  {vendors.map((vendor, i) => {
+                    const isLinked = !!vendor.profile_id
+                    return (
                     <motion.div
                       key={vendor.id}
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="glass rounded-2xl p-5 flex flex-col gap-3 hover:shadow-lg transition-shadow cursor-default"
+                      className="glass rounded-2xl p-5 flex flex-col gap-3 transition-shadow cursor-default"
+                      style={{
+                        opacity: isLinked ? 1 : 0.5,
+                        filter: isLinked ? 'none' : 'grayscale(0.6)',
+                        boxShadow: isLinked ? undefined : 'none',
+                      }}
                     >
                       {/* 업체 정보 */}
                       <div className="flex items-start justify-between gap-2">
@@ -365,7 +373,7 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
                           )}
                         </div>
                         <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                          style={{ background: selectedStage.color }} />
+                          style={{ background: isLinked ? selectedStage.color : '#9ca3af' }} />
                       </div>
 
                       {vendor.description && (
@@ -382,7 +390,12 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
                           </span>
                         )}
                         <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                          {(() => {
+                          {!isLinked ? (
+                            <span className="text-xs font-semibold px-3 py-1.5 rounded-xl"
+                              style={{ background: 'rgba(107,114,128,0.12)', color: '#9ca3af', border: '1px solid #e5e7eb' }}>
+                              신청불가
+                            </span>
+                          ) : (() => {
                             const m = vendorMeetingMap[vendor.id]
                             if (!m) return (
                               <button onClick={() => setSelectedVendor(vendor)}
@@ -440,7 +453,8 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </motion.div>
