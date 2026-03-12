@@ -81,6 +81,11 @@ export async function DELETE(req: Request) {
   const supabase = await checkAdmin()
   if (!supabase) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   const { id } = await req.json()
+
+  // 관련 meeting_requests 먼저 삭제 (FK 제약 해소)
+  const { error: mrError } = await (supabase.from('meeting_requests') as any).delete().eq('vendor_id', id)
+  if (mrError) return NextResponse.json({ error: mrError.message }, { status: 500 })
+
   const { error } = await (supabase.from('vendors') as any).delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

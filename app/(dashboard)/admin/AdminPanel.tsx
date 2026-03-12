@@ -191,7 +191,7 @@ export default function AdminPanel() {
 
   // ── 벤더사 삭제 ──
   async function deleteVendor(id: string) {
-    if (!confirm('이 업체를 삭제하시겠습니까?')) return
+    if (!confirm('이 업체를 삭제하시겠습니까?\n관련된 미팅 요청 내역도 함께 삭제됩니다.')) return
     const res = await fetch('/api/admin/vendors', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
