@@ -90,6 +90,23 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['doctor_progress']['Insert']>
       }
 
+      doctor_guide_progress: {
+        Row: {
+          profile_id: string
+          completed_steps: number[]
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          completed_steps?: number[]
+          updated_at?: string
+        }
+        Update: {
+          completed_steps?: number[]
+          updated_at?: string
+        }
+      }
+
       // ── 미팅 요청 (기존 Scheduling + Meetings 통합) ──
       meeting_requests: {
         Row: {

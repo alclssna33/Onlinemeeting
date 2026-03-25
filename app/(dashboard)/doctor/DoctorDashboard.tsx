@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 import MeetingRequestModal from './MeetingRequestModal'
 import DoctorMeetings from './DoctorMeetings'
 import DoctorBiddingBoard from './bidding/DoctorBiddingBoard'
@@ -246,6 +247,15 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
             ⚡ 일사천리
           </button>
         )}
+        <Link href="/doctor/opening-guide"
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={{
+            background: 'var(--glass-bg)',
+            color: '#059669',
+            border: '1px solid rgba(5,150,105,0.4)',
+          }}>
+          📋 개원가이드
+        </Link>
       </div>
 
       {/* 내 미팅 탭 */}

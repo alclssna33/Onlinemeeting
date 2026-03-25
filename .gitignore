@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 로컬 참조 파일
+_reference_opening_guide.html
+tsc_errors.txt
