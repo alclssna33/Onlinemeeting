@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import GuideTimeline from './GuideTimeline';
 import GuideGantt from './GuideGantt';
 import GuideChecklist from './GuideChecklist';
@@ -21,7 +22,15 @@ export default function OpeningGuidePage() {
       {/* Page Header */}
       <div className="bg-[#112b1c] text-white px-4 py-3 sticky top-0 z-20 shadow-lg">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-base font-bold mb-2">[일사천리] 병원 개원 프로세스</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <Link
+              href="/doctor"
+              className="flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors flex-shrink-0"
+            >
+              ‹ 대시보드
+            </Link>
+            <h1 className="text-base font-bold leading-tight">[개원비밀공간-일사천리] 병의원 개원 프로세스</h1>
+          </div>
           <div className="flex gap-0 border-t border-white/10 -mx-4 px-4">
             {TABS.map(t => (
               <button
