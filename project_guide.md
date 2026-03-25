@@ -159,6 +159,20 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - `vercel.json`: 매일 자정(UTC) Cron 실행 설정
 - `CRON_SECRET` 환경변수로 무단 호출 차단
 
+### ✅ Step 8 — [개원비밀공간-일사천리] 개원가이드 이식
+- `_reference_opening_guide.html`: 원본 단일 HTML 파일 (gitignore, 로컬 참조용)
+- `scripts/extract-guide-data.cjs`: 원본 HTML에서 JS 데이터 추출 스크립트
+- `lib/opening-guide-data.ts`: 25개 Step + 17개 Google Docs 본문 + 6개 페이즈 TypeScript 데이터 (146KB)
+- `app/(dashboard)/doctor/opening-guide/`: 3탭 페이지
+  - `page.tsx`: 헤더(뒤로가기 포함) + 탭 전환
+  - `GuideTimeline.tsx`: 단계별 가이드 타임라인 + 모달 (핵심 포인트, 상세 가이드 문서, 도구, 개비공 서비스)
+  - `GuideGantt.tsx`: D-120~D-day 준비 일정표 Gantt 차트
+  - `GuideChecklist.tsx`: 체크리스트 (인쇄/PDF 지원)
+  - `useOpeningProgress.ts`: 체크 진행 상태 공용 훅 (서버 로드 + 300ms debounce 저장)
+- `app/api/opening-guide/progress/route.ts`: GET/PATCH — 진행 상태 서버 저장
+- `supabase/migration_guide_progress.sql`: `doctor_guide_progress` 테이블 + RLS (**이미 Supabase에 실행 완료**)
+- 원장 대시보드에 `📋 개원가이드` 링크 버튼 추가
+
 ---
 
 ## Google Meet + Calendar 완전 가이드
@@ -293,12 +307,80 @@ npm run dev
 
 ---
 
+## 개원가이드 내용 수정 방법
+
+개원가이드의 텍스트 내용은 **`lib/opening-guide-data.ts`** 한 파일에 집중되어 있습니다.
+
+### 구조 한눈에 보기
+
+```
+lib/opening-guide-data.ts
+├── PH[]        — 6개 페이즈 (준비기/구축기/인력기/사전준비/인허가/D-day)
+├── S[]         — 25개 Step (각 Step의 제목·팁·링크 목록)
+└── DOCS{}      — 17개 Google Docs 상세 가이드 본문 (HTML)
+```
+
+### Step 내용 수정 (제목, 팁, 링크)
+
+`S[]` 배열에서 해당 Step의 객체를 찾아 수정합니다.
+
+```typescript
+// lib/opening-guide-data.ts → S[] 배열
+{
+  "id": 0,
+  "d": "D-120 이전",      // 타이밍 뱃지
+  "n": "01",              // Step 번호
+  "t": "구상 및 입지분석 …", // 카드/체크리스트에 표시되는 제목
+  "tip": "단순히 유동 인구가 …", // 모달 '핵심 포인트' (HTML 가능)
+  "det": [ … ],           // 상세 가이드 링크 목록
+  "tls": [ … ],           // 외부 도구 링크 목록
+  "gb":  [ … ]            // 개비공 서비스 링크 목록
+}
+```
+
+### 상세 가이드 문서 본문 수정
+
+`DOCS{}` 객체에서 해당 키를 찾아 `html` 값을 수정합니다.
+
+```typescript
+// lib/opening-guide-data.ts → DOCS 객체
+"loc1": {
+  "title": "입지분석 1편",
+  "html": "<h3>…</h3><ul><li>…</li></ul>"  // ← 이 HTML을 직접 수정
+}
+```
+
+> **키 매핑** (Step의 `det[].dk` 값 → DOCS 키):
+> `loc1/loc2`(입지분석), `loan`(대출), `tax`(임대차/세무사), `interior`(인테리어),
+> `network`(PC/네트워크), `salary`(장비/급여), `labor`(노무사), `hire1~5`(직원구인),
+> `univ`(대학병원), `health`(보건소), `hira`(심평원), `uniform`(유니폼), `rehearsal`(리허설)
+
+### Step 추가 / 삭제
+
+1. `S[]`에 객체 추가 또는 제거
+2. `PH[]`에서 해당 페이즈의 `s: [인덱스 배열]` 수정
+3. Step `id`는 `S[]`의 배열 인덱스와 일치해야 함 (0부터 순서대로)
+
+### 원본 HTML에서 재추출이 필요한 경우
+
+원본 `_reference_opening_guide.html`이 업데이트된 경우:
+```bash
+cd C:\dev\gaebigong-v2
+node scripts/extract-guide-data.cjs
+# → lib/opening-guide-data.ts 자동 덮어쓰기
+```
+
+---
+
 ## 다음 단계
 
-### Step 8 — Vercel 배포
-- Vercel에 GitHub 연동 배포
-- 환경변수 전체 설정 (아래 주의사항 참고)
-- `NEXT_PUBLIC_APP_URL` 프로덕션 URL로 변경
+### Step 9 — 추가 기능 (예정)
+- 개원가이드 내용 보완 (미연결 단계: 06·11~16·20~21·23번 Google Docs 연결)
+- 기타 기능 확장
+
+### ✅ Step 8 — Vercel 배포 (완료)
+- Vercel GitHub 연동 자동 배포 설정 완료
+- 환경변수 전체 설정 완료
 - Cron은 Vercel Pro 플랜 이상에서 지원 (`vercel.json` 이미 설정 완료)
 - 로컬 Cron 테스트: `GET /api/cron/cleanup?secret={CRON_SECRET}`
 
