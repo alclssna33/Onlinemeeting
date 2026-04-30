@@ -13,6 +13,7 @@ interface MeetingRequestPayload {
   stageName: string
   proposedTimes: string[]
   platformUrl: string
+  productName?: string | null
 }
 
 interface MeetingConfirmedPayload {

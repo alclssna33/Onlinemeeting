@@ -12,6 +12,7 @@ type Props = {
   stage: Stage
   doctorId: string
   meetingType?: 'standard' | 'express'
+  productName?: string
   onClose: () => void
 }
 
@@ -35,7 +36,7 @@ function getTodayMin(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
 }
 
-export default function MeetingRequestModal({ vendor, stage, doctorId, meetingType = 'standard', onClose }: Props) {
+export default function MeetingRequestModal({ vendor, stage, doctorId, meetingType = 'standard', productName, onClose }: Props) {
   // 5개 슬롯: null = 미선택, string = datetime-local value ("YYYY-MM-DDTHH:mm")
   const [slots, setSlots] = useState<(string | null)[]>(Array(SLOT_COUNT).fill(null))
   const [note, setNote] = useState('')
@@ -84,6 +85,7 @@ export default function MeetingRequestModal({ vendor, stage, doctorId, meetingTy
       meeting_type: meetingType,
       proposed_times: proposedTimes,
       note: note || null,
+      product_name: productName || null,
     }).select('id').single()
 
     if (error) {

@@ -7,7 +7,7 @@ import BiddingVendorManager from './BiddingVendorManager'
 import DoctorBiddingAssigner from './DoctorBiddingAssigner'
 import BiddingMeetingMonitor from './BiddingMeetingMonitor'
 
-type Stage = { id: number; name: string; color: string; order_index: number; description: string | null }
+type Stage = { id: number; name: string; color: string; order_index: number; description: string | null; stage_type: string | null }
 type LinkedProfile = { name: string; email: string } | null
 type Vendor = {
   id: string
@@ -20,6 +20,7 @@ type Vendor = {
   website: string | null
   is_active: boolean
   profile_id: string | null
+  region: string | null
   linked_profile: LinkedProfile
 }
 
@@ -839,6 +840,19 @@ export default function AdminPanel() {
                 <option value="">개원 단계 선택 *</option>
                 {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              {/* 삼성메디슨 대리점 전용: 담당 지역 */}
+              {stages.find(s => s.id === editingVendor.category_id)?.stage_type === 'samsung_medison' && (
+                <div>
+                  <input type="text" placeholder="담당 지역 (예: 유비케어 — 서울 강남·서초·관악 등)"
+                    value={editingVendor.region ?? ''}
+                    onChange={e => setEditingVendor(p => ({ ...p, region: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none"
+                    style={{ background: 'rgba(29,78,216,0.05)', borderColor: '#1d4ed8', color: 'var(--text-primary)' }} />
+                  <p className="text-xs mt-1 px-1" style={{ color: '#1d4ed8' }}>
+                    📡 삼성메디슨 대리점 — 담당 지역 범위를 메모용으로 입력하세요 (원장 화면에는 표시되지 않음)
+                  </p>
+                </div>
+              )}
               <textarea placeholder="업체 소개 (선택)" rows={2}
                 value={editingVendor.description ?? ''}
                 onChange={e => setEditingVendor(p => ({ ...p, description: e.target.value }))}

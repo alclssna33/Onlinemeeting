@@ -28,13 +28,13 @@ export default async function DoctorPage() {
   // 개원 단계 목록
   const { data: stages } = await supabase
     .from('stages')
-    .select('id, name, color, icon')
+    .select('id, name, color, icon, stage_type')
     .order('order_index')
 
   // 전체 벤더사
   const { data: vendorsRaw } = await (supabase
     .from('vendors') as any)
-    .select('id, company_name, rep_name, description, website, category_id, email, phone, profile_id')
+    .select('id, company_name, rep_name, description, website, category_id, email, phone, profile_id, region')
     .eq('is_active', true)
 
   const vendors: any[] = vendorsRaw ?? []

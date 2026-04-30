@@ -8,12 +8,14 @@ import DoctorMeetings from './DoctorMeetings'
 import DoctorBiddingBoard from './bidding/DoctorBiddingBoard'
 import Toast, { ToastItem } from '@/app/components/Toast'
 import { createClient } from '@/lib/supabase/client'
+import SamsungMedisonSection from './SamsungMedisonSection'
 
 type Stage = {
   id: number
   name: string
   color: string
   icon: string
+  stage_type: string | null
 }
 
 type Vendor = {
@@ -335,6 +337,18 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
               transition={{ duration: 0.2 }}
               className="h-full"
             >
+              {/* 삼성메디슨 특수 섹션 */}
+              {selectedStage?.stage_type === 'samsung_medison' ? (
+                <SamsungMedisonSection
+                  stage={selectedStage}
+                  vendors={vendors}
+                  doctorId={doctorId}
+                  meetingType={authExpress ? 'express' : 'standard'}
+                  vendorMeetingMap={vendorMeetingMap}
+                  onSelect={handleSelect}
+                />
+              ) : (
+              <>
               {/* 단계 헤더 */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-3 h-3 rounded-full shrink-0"
@@ -467,12 +481,14 @@ export default function DoctorDashboard({ stages, vendorsByStage, doctorId, doct
                   })}
                 </div>
               )}
+              </>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
       </div>}
 
-      {/* 미팅 신청 모달 */}
+      {/* 미팅 신청 모달 (일반 스테이지용) */}
       {selectedVendor && (
         <MeetingRequestModal
           vendor={selectedVendor}

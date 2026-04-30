@@ -41,6 +41,7 @@ export type Database = {
           description: string | null
           website: string | null
           is_active: boolean
+          region: string | null      // 삼성메디슨 대리점 담당 지역
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['vendors']['Row'], 'created_at'>
@@ -56,6 +57,7 @@ export type Database = {
           order_index: number    // 표시 순서
           color: string | null   // 카테고리 색상 (hex)
           icon: string | null    // lucide icon name
+          stage_type: string | null  // 'standard' | 'samsung_medison'
         }
         Insert: Omit<Database['public']['Tables']['stages']['Row'], 'id'>
         Update: Partial<Database['public']['Tables']['stages']['Insert']>
@@ -122,6 +124,7 @@ export type Database = {
           calendar_event_id: string | null
           note: string | null
           vendor_note: string | null
+          product_name: string | null    // 삼성메디슨 미팅 시 제품명
           selection_status: SelectionStatus | null
           created_at: string
           updated_at: string

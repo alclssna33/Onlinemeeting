@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       .select(`
         doctor_id,
         proposed_times,
+        product_name,
         stage:stages(name),
         vendor:vendors(company_name, rep_name, email)
       `)
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
       stageName: stage.name,
       proposedTimes: meeting.proposed_times,
       platformUrl: `${platformUrl}/vendor`,
+      productName: meeting.product_name,
     })
 
     return NextResponse.json({ ok: true })
