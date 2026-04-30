@@ -72,6 +72,14 @@ export default function SamsungMedisonSection({ stage, vendors, doctorId, meetin
 
   const provinceEntry = province
 
+  // 가나다순 정렬
+  const sortedProvinces = [...PROVINCE_LIST].sort((a, b) =>
+    a.name.localeCompare(b.name, 'ko-KR')
+  )
+  const sortedDistricts = provinceEntry && hasDistricts(provinceEntry)
+    ? [...provinceEntry.districts].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR'))
+    : []
+
   return (
     <div className="flex flex-col gap-5">
       {/* 섹션 설명 */}
@@ -127,7 +135,7 @@ export default function SamsungMedisonSection({ stage, vendors, doctorId, meetin
             }}
           >
             <option value="">시/도 선택</option>
-            {PROVINCE_LIST.map(p => (
+            {sortedProvinces.map(p => (
               <option key={p.name} value={p.name}>{p.name}</option>
             ))}
           </select>
@@ -156,7 +164,7 @@ export default function SamsungMedisonSection({ stage, vendors, doctorId, meetin
                 }}
               >
                 <option value="">구/시/군 선택</option>
-                {provinceEntry.districts.map(d => (
+                {sortedDistricts.map(d => (
                   <option key={d.name} value={d.name}>{d.name}</option>
                 ))}
               </select>

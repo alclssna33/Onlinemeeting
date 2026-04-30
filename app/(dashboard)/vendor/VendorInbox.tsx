@@ -18,6 +18,7 @@ type Meeting = {
   meet_link: string | null
   note: string | null
   vendor_note: string | null
+  product_name: string | null
   created_at: string
   stage: { name: string; color: string; icon: string }
   doctor_profile: { name: string; phone: string | null }
@@ -167,6 +168,16 @@ function MeetingCard({ meeting, onConfirm, onReject, loading, overrideMeetLink }
               Meet 링크 준비 중
             </span>
           )}
+        </div>
+      )}
+
+      {/* 삼성메디슨 요청 제품명 */}
+      {meeting.product_name && (
+        <div className="px-5 pb-2">
+          <div className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-xl font-semibold"
+            style={{ background: 'rgba(29,78,216,0.1)', color: '#1d4ed8', border: '1px solid rgba(29,78,216,0.2)' }}>
+            📡 요청 장비: {meeting.product_name}
+          </div>
         </div>
       )}
 

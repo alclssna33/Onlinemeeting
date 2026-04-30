@@ -60,7 +60,7 @@ export default async function VendorPage() {
   const { data: meetings, error: meetingsError } = await (adminClient
     .from('meeting_requests')
     .select(`
-      id, status, selection_status, proposed_times, confirmed_time, meet_link, note, vendor_note, created_at,
+      id, status, selection_status, proposed_times, confirmed_time, meet_link, note, vendor_note, product_name, created_at,
       stage:stages(name, color, icon),
       doctor_profile:profiles!meeting_requests_doctor_id_fkey(name, phone, doctors(clinic_name))
     `)
